@@ -82,6 +82,25 @@ open class MainActivity: AppCompatActivity {
             setRecentsScreenshotEnabled(false)
         }
 
+        // Android Back on the main tabs: from any tab but Wallet, go to Wallet; on Wallet, leave the
+        // app as usual. Registered BEFORE setContent and without a lifecycle owner so it's the
+        // lowest-priority callback: SkipUI's own Back handling (popping a pushed screen, closing a
+        // sheet) registers later and always wins. The handler is set from Swift (MainTabView via
+        // PlatformBridge.setBackHandler) only while a non-Wallet tab is selected.
+        onBackPressedDispatcher.addCallback(object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val handler = wallet.service.BackPressHolder.handler
+                if (handler != null) {
+                    handler()
+                } else {
+                    // Nothing to do in-app: fall through to the default (minimize).
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        })
+
         setContent {
             val saveableStateHolder = rememberSaveableStateHolder()
             saveableStateHolder.SaveableStateProvider(true) {

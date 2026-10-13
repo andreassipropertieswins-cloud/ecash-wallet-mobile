@@ -69,6 +69,24 @@ public enum PlatformBridge {
         #endif
     }
 
+    /// What the Android **Back** button does when nothing on screen claims it (no pushed screen, no
+    /// sheet): run `handler` instead of leaving the app. The tab bar sets it to "go to the Wallet
+    /// tab" while another tab is selected, and clears it on Wallet so Back minimizes as usual.
+    /// `Main.kt` owns the actual `OnBackPressedCallback` — `androidx.activity` isn't on this
+    /// module's classpath. No-op off Android.
+    public static func setBackHandler(_ handler: @escaping () -> Void) {
+        #if SKIP
+        BackPressHolder.handler = handler
+        #endif
+    }
+
+    /// Restore Android's default Back (leave the app) — see `setBackHandler`.
+    public static func clearBackHandler() {
+        #if SKIP
+        BackPressHolder.handler = nil
+        #endif
+    }
+
     /// Block (or unblock) screen capture for the whole window — Android `FLAG_SECURE`.
     /// Used by seed-bearing screens (Backup reveal/verify, Import). No-op off Android and when
     /// no activity is tracked (fail-safe: the screen still shows; capture just isn't blocked).
@@ -177,6 +195,13 @@ public final class BiometricCallback: android.hardware.biometrics.BiometricPromp
 /// `onNewIntent` (warm start). Drained by `PlatformBridge.takePaymentLink`.
 public final class PendingPaymentLinkHolder {
     public static var current: String? = nil
+    public init() {}
+}
+
+/// Set by `PlatformBridge.setBackHandler`, read by `Main.kt`'s Back callback.
+// SKIP @nobridge
+public final class BackPressHolder {
+    public static var handler: (() -> Void)? = nil
     public init() {}
 }
 

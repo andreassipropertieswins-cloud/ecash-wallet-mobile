@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 import SwiftUI
+import WalletService
 
 /// The app's main tabs. Top-level so `AppState` can own the selection (lets "See all" on Home
 /// switch to Activity).
@@ -85,5 +86,18 @@ struct MainTabView: View {
         // Register for push once the main shell is reached (after onboarding). Fires the permission
         // prompt + fetches the device token; idempotent, so this no-ops on later launches.
         .task { await app.push.register() }
+        // Android Back: from another tab, go to Wallet; on Wallet, leave the app (Android's default).
+        // A pushed screen or open sheet still takes Back first (see Main.kt). No-op on iOS.
+        .onAppear { updateBackHandler() }
+        .onChange(of: selection) { _, _ in updateBackHandler() }
+        .onDisappear { PlatformBridge.clearBackHandler() }   // lock screen / onboarding took over
+    }
+
+    private func updateBackHandler() {
+        if selection == .wallet {
+            PlatformBridge.clearBackHandler()
+        } else {
+            PlatformBridge.setBackHandler { selection = .wallet }
+        }
     }
 }
