@@ -142,7 +142,7 @@ struct WalletHomeScreen: View {
         }
     }
 
-    /// eCash-only nudge shown when the wallet holds pre-fork coins (shared with Bitcoin). Tapping
+    /// eCash-only nudge shown when a Bitcoin check found coins still live on Bitcoin (shared). Tapping
     /// opens the split flow; the ✕ dismisses it for this session (it also clears itself once split,
     /// since the summary recomputes `needsSplitCount == 0`).
     /// Open Send prefilled from an incoming payment link, if one is waiting. Called from BOTH
@@ -249,7 +249,7 @@ struct WalletHomeScreen: View {
                 claimSweepNudge
             }
 
-            // Split-coins nudge: eCash wallet holding pre-fork (shared-with-Bitcoin) coins.
+            // Split-coins nudge: eCash wallet holding coins a Bitcoin check found still shared.
             if let s = app.splitSummary, s.needsSplitCount > 0, !splitDismissed {
                 splitNudge
             }

@@ -23,7 +23,7 @@ final class SplitViewModel {
         case failed(String)
     }
 
-    /// The wallet's split status at present-time: how much is spendable and how much is pre-fork.
+    /// The wallet's split status at present-time: how much is spendable and how much Bitcoin says is shared.
     let summary: SplitSummary
     let unitLabel: String
     let networkDisplayName: String
@@ -55,7 +55,7 @@ final class SplitViewModel {
 
     /// The total that will move (the whole spendable balance — drain-all v1).
     var amount: Amount { Amount(sats: summary.spendableSats) }
-    /// The pre-fork amount that actually needs splitting (may be < `amount` if some coins are already
+    /// The shared amount that actually needs splitting (may be < `amount` if some coins are already
     /// safe). Informational.
     var needsSplitAmount: Amount { Amount(sats: summary.needsSplitSats) }
     var needsSplitCount: Int { Int(summary.needsSplitCount) }

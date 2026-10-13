@@ -55,7 +55,7 @@ exhaustive `switch` on purpose:
 |---|---|---|
 | `NetworkRegistry.bundledParams` (WalletService) | Esplora/Electrum default, explorer template, unit `ECX`, sub-unit `szat`, display name | config + L2L |
 | `NetworkRegistry` fork height | **964,000**? (CLAUDE.md §1 says activation at 964,000; the config's `fork_height` wins) | config `fork_height` |
-| `NetworkRegistry` nLockTime replay marker | same `499_999_999` as the test forks? | L2L |
+| `NetworkRegistry` nLockTime replay marker | **`499_999_998`**: one lower than the test forks' `499_999_999` (`LOCKTIME_THRESHOLD - 1`). Set it in `replayProtectionLockHeight(for:)`, and update `docs/coin-splitting.md` §2 | L2L (decided) |
 | `BDKSeam.network` | `Network.bitcoin` (eCash = Bitcoin params, `docs/key-derivation.md`) | settled |
 | `WalletNetwork.keyFamily` / `sharesKeys` | same family as Bitcoin + the test forks (coin-type `0'`) | settled |
 | `WalletNetwork.supportsCoinSplit` | **true**: this is the chain where splitting real coins matters most | settled |
@@ -128,7 +128,7 @@ What already carries over, and what doesn't:
 1. The real fork's config `id` and `display_name`.
 2. Its `OP_DRIVECHAIN` opcode (NOP5 or NOP8).
 3. Fork height: 964,000 (CLAUDE.md §1), or has it moved?
-4. The nLockTime replay-protection marker.
+4. ~~The nLockTime replay-protection marker.~~ Decided: `499_999_998` (one below the test forks).
 5. Hosted enforcer, Esplora, Electrum, explorer and CoinNews URLs; is the enforcer public for
    mobile use?
 6. Real-fork Thunder: index URL, and whether its addresses and keys differ from betanet Thunder's.

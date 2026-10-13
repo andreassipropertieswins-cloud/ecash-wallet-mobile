@@ -380,29 +380,23 @@ public struct Utxo: Equatable, Hashable, Sendable {
     }
 }
 
-/// A read-only summary of a wallet's coin-split status: how much is drainable, and how much of that is
-/// **pre-fork** (confirmed below the network's fork height → shared with the other chain, so it needs
-/// splitting). Drives the split nudge + the amount shown in the flow. Bridge-safe (signed Int fields).
+/// A read-only summary of a wallet's coin-split status: how much is drainable, and how much of that
+/// Bitcoin's explorer reported as still live on Bitcoin (shared → needs splitting). Drives the split
+/// nudge + the amount shown in the flow. Bridge-safe (signed Int fields).
 public struct SplitSummary: Equatable, Sendable {
     /// Total spendable sats — what a "Split" (drain) would move.
     public let spendableSats: Int64
-    /// Sats in pre-fork coins — the amount that actually *needs* splitting (`< spendableSats` when the
-    /// wallet also holds post-fork, already-safe coins).
+    /// Sats in coins Bitcoin reported as shared — the amount that actually *needs* splitting
+    /// (`< spendableSats` when the wallet also holds safe or unchecked coins).
     public let needsSplitSats: Int64
-    /// Number of pre-fork UTXOs that need splitting. `0` → nothing to split (don't nudge).
+    /// Number of shared UTXOs that need splitting. `0` → nothing to split (don't nudge).
     public let needsSplitCount: Int32
     /// Sats we can't vouch for either way — see `unverifiedCount`.
     public let unverifiedSats: Int64
-    /// UTXOs whose status is genuinely UNKNOWN without asking the other chain.
-    ///
-    /// Confirming at/above the fork height does NOT prove a coin is chain-specific. eCash's replay
-    /// marker is permissive, not mandatory (`tx_verify.cpp`: the magic nLockTime is *treated as
-    /// final*, nothing requires it), so an ordinary Bitcoin-valid transaction still confirms on
-    /// eCash — and its outputs then exist on BOTH chains at post-fork heights. Any wallet other
-    /// than ours produces exactly that.
+    /// UTXOs Bitcoin hasn't been asked about yet (or the check couldn't reach it).
     ///
     /// Kept separate from `needsSplitCount` on purpose: unverified coins must not drive the Home
-    /// nudge, or every wallet nags forever. They're what the explicit Bitcoin check resolves.
+    /// nudge — only an actual answer from Bitcoin does. They're what the Bitcoin check resolves.
     public let unverifiedCount: Int32
 
     public init(spendableSats: Int64, needsSplitSats: Int64, needsSplitCount: Int32,
@@ -416,27 +410,22 @@ public struct SplitSummary: Equatable, Sendable {
 }
 
 extension SplitSummary {
-    /// Classify spendable UTXOs by confirmation height against the network's `forkHeight`: a UTXO
-    /// confirmed **below** `forkHeight` is pre-fork (shared with the other chain → needs splitting);
-    /// at/above it — or unconfirmed (recent, so post-fork) — it is chain-specific and already safe.
-    /// `forkHeight == nil` (networks where splitting doesn't apply) → nothing needs splitting. Pure +
-    /// deterministic so it's unit-tested without BDK; the engine feeds it real UTXOs.
-    /// `knownShared` / `knownSafe` are outpoint keys ("txid:vout") resolved by asking the OTHER
-    /// chain directly, which is the only authoritative test. They win over the height heuristic in
-    /// both directions:
+    /// Classify spendable UTXOs by what **Bitcoin** said about each one — nothing else.
     ///
-    ///  - A pre-fork coin already **spent** on Bitcoin can't be replayed onto (that would be a
-    ///    double-spend), so it needs no split even though its height says otherwise — the height
-    ///    test over-reports here.
-    ///  - A post-fork coin created by a non-replay-protected spend exists on both chains, so it
-    ///    DOES need splitting even though its height says otherwise — the height test under-reports
-    ///    here, which is the dangerous direction: we'd tell the user they're separated when they
-    ///    aren't, and their next spend would move their BTC too.
+    /// `knownShared` / `knownSafe` are outpoint keys ("txid:vout") resolved by asking Bitcoin's
+    /// explorer directly (`SplitCheckService`). A coin in neither list hasn't been checked (or the
+    /// check couldn't reach Bitcoin) and lands in `unverified`: it never drives the nudge.
+    ///
+    /// There is deliberately **no height heuristic**. Confirmation height against the fork is only a
+    /// proxy, and it's wrong in both directions: a pre-fork coin already spent on Bitcoin can't be
+    /// replayed (over-reports), and a post-fork coin from a non-replay-protected spend exists on both
+    /// chains (under-reports — the dangerous direction). Removed 2026-10-10.
+    ///
     /// Takes ARRAYS, not Sets, and converts internally: a `Set<String>` parameter makes Swift infer
     /// array literals at call sites as sets, but Skip transpiles those literals to Kotlin `Array`,
     /// and the Kotlin compile then fails with "actual type is 'Array<String>', but 'Set<String>' was
     /// expected". Only `skip test` catches that — the Swift build is perfectly happy.
-    static func classify(_ spendable: [SplitUtxo], forkHeight: Int64?,
+    static func classify(_ spendable: [SplitUtxo],
                          knownShared: [String] = [], knownSafe: [String] = []) -> SplitSummary {
         let knownShared = Set(knownShared)
         let knownSafe = Set(knownSafe)
@@ -452,15 +441,8 @@ extension SplitSummary {
                 needSats += u.sats
                 needCount += Int32(1)
             } else if knownSafe.contains(key) {
-                continue                                  // verified chain-specific
-            } else if forkHeight == nil {
-                continue                                  // splitting doesn't apply on this network
-            } else if let fork = forkHeight, let h = u.height, h < fork {
-                needSats += u.sats
-                needCount += Int32(1)
+                continue                                  // Bitcoin never had it, or already spent it
             } else {
-                // At/above the fork, or unconfirmed. Previously treated as safe outright; it isn't
-                // knowable without the other chain, and unconfirmed coins fell through entirely.
                 unverifiedSats += u.sats
                 unverifiedCount += Int32(1)
             }
@@ -470,19 +452,17 @@ extension SplitSummary {
     }
 }
 
-/// One spendable UTXO reduced to what classification needs: its confirmation `height` (nil =
-/// unconfirmed) and value. Internal — the engine builds these from BDK's `LocalOutput`.
+/// One spendable UTXO reduced to what classification needs: its outpoint and value. Internal — the
+/// engine builds these from BDK's `LocalOutput`.
 struct SplitUtxo: Equatable {
-    let height: Int64?
     let sats: Int64
-    /// Outpoint, so a verification result from the other chain can be matched back to this coin.
+    /// Outpoint, so a verification result from Bitcoin can be matched back to this coin.
     let txid: String
     let vout: Int32
 
     var outpointKey: String { "\(txid):\(vout)" }
 
-    init(height: Int64?, sats: Int64, txid: String = "", vout: Int32 = Int32(0)) {
-        self.height = height
+    init(sats: Int64, txid: String, vout: Int32) {
         self.sats = sats
         self.txid = txid
         self.vout = vout

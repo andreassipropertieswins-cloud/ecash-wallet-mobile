@@ -2,6 +2,7 @@
 // Licensed under the GNU General Public License v2.0 or later
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+import Foundation
 import Testing
 @testable import ECashWalletMobile
 
@@ -31,5 +32,39 @@ import Testing
     @Test func noAnswerIsUnknownNotSafe() {
         // "We couldn't tell" must never collapse into "you're fine" on a money screen.
         #expect(SplitCheckService.verdict(txExistsOnBitcoin: true, spent: nil) == .unknown)
+    }
+
+    // MARK: - The one automatic check after import / copy
+
+    @Test func anImportedWalletOwesOneCheckUntilItSucceeds() {
+        let store = SplitCheckStore()
+        let id = "split-pending-\(UUID().uuidString)"
+        defer { store.forget(walletId: id) }
+        #expect(!store.needsInitialCheck(walletId: id))      // nothing owed by default (e.g. create)
+        store.markNeedsInitialCheck(walletId: id)
+        #expect(store.needsInitialCheck(walletId: id))
+        store.clearInitialCheck(walletId: id)
+        #expect(!store.needsInitialCheck(walletId: id))
+    }
+
+    /// Removing a wallet must not leave a check owed to a future wallet that reuses nothing but the
+    /// storage key (Golden Rule §5).
+    @Test func removingAWalletDropsItsOwedCheck() {
+        let store = SplitCheckStore()
+        let id = "split-pending-\(UUID().uuidString)"
+        store.markNeedsInitialCheck(walletId: id)
+        store.forget(walletId: id)
+        #expect(!store.needsInitialCheck(walletId: id))
+    }
+
+    /// "Couldn't reach Bitcoin" is never recorded, so it can't stand in for an answer.
+    @Test func unknownVerdictsAreNotStored() {
+        let store = SplitCheckStore()
+        let id = "split-pending-\(UUID().uuidString)"
+        defer { store.forget(walletId: id) }
+        store.merge(["a:0": .unknown, "b:0": .shared, "c:0": .chainSpecific], walletId: id)
+        let known = store.partitioned(walletId: id)
+        #expect(known.shared == ["b:0"])
+        #expect(known.safe == ["c:0"])
     }
 }

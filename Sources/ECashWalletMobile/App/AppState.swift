@@ -381,6 +381,7 @@ final class AppState {
                       scriptType: ScriptType = .bip84) throws -> ManagedWallet {
         let wallet = try manager.importWallet(label: label, network: network, mnemonic: mnemonic,
                                               scriptType: scriptType)
+        scheduleInitialSplitCheck(for: wallet)
         resetPerWalletState()   // the imported wallet is auto-selected
         refresh()
         // Sync immediately — an imported wallet exists precisely BECAUSE it has history, and
@@ -394,6 +395,7 @@ final class AppState {
     @discardableResult
     func importPrivateKey(label: String, network: WalletNetwork, wif: String) throws -> ManagedWallet {
         let wallet = try manager.importPrivateKey(label: label, network: network, wif: wif)
+        scheduleInitialSplitCheck(for: wallet)
         resetPerWalletState()   // the imported wallet is auto-selected
         refresh()
         // Sync immediately — an imported wallet exists precisely BECAUSE it has history, and
@@ -469,7 +471,8 @@ final class AppState {
                 // "Wallet 1 (Betanet)": the two wallets share a name otherwise, and the network is
                 // what tells them apart.
                 let label = "\(wallet.label) (\(NetworkRegistry.params(for: network).displayName))"
-                _ = try self.manager.copyWallet(id: id, to: network, label: label)
+                let copy = try self.manager.copyWallet(id: id, to: network, label: label)
+                self.scheduleInitialSplitCheck(for: copy)
                 self.resetPerWalletState()   // the copy is auto-selected
                 self.refresh()
                 // Sync immediately: the point of the copy is to see what this seed holds there.
@@ -1206,19 +1209,20 @@ final class AppState {
         #endif
     }
 
-    /// Split status with any verdicts a previous Bitcoin check established already applied, so the
-    /// answer doesn't silently regress to the height heuristic between checks.
+    /// Split status with the verdicts Bitcoin checks have established. Those are the only thing that
+    /// flags a coin — there's no height heuristic (`SplitSummary.classify`).
     private func splitSummaryUsingCachedChecks(walletId id: String) throws -> SplitSummary {
         let known = splitCheckStore.partitioned(walletId: id)
         return try walletOps.splitSummary(walletId: id, knownShared: known.shared, knownSafe: known.safe)
     }
 
-    /// Ask **Bitcoin** whether this wallet's eCash coins still exist there — the only authoritative
-    /// test for whether they need splitting (`SplitCheckService` explains why height isn't).
+    /// Ask **Bitcoin** whether this wallet's eCash coins still exist there — the only test for
+    /// whether they need splitting (`SplitCheckService` explains why height isn't one).
     ///
-    /// On demand rather than automatic: it costs a request per coin against a backend for a chain
-    /// this wallet otherwise never talks to, and it hands that operator the wallet's addresses. The
-    /// cheap height heuristic keeps driving the Home nudge; this is how a user gets certainty.
+    /// Runs automatically ONCE per imported or copied wallet (after its first sync — see
+    /// `scheduleInitialSplitCheck`), and otherwise only from the Settings button. Not on every sync:
+    /// it's a request per coin against a chain this wallet otherwise never talks to, and it hands
+    /// that operator the wallet's txids.
     ///
     /// Read-only — HTTP GETs against a Bitcoin Esplora. No key is touched and nothing is broadcast,
     /// so it cannot move anyone's BTC.
@@ -1240,16 +1244,22 @@ final class AppState {
             return
         }
         let service = SplitCheckService(esploraBaseURL: bitcoinEsplora)
-        guard let candidates = try? walletOps.splitCandidates(walletId: id), !candidates.isEmpty else {
+        guard let candidates = try? walletOps.splitCandidates(walletId: id) else { return }
+        guard !candidates.isEmpty else {
+            // Nothing to ask about — an imported wallet with no coins has had its check.
+            splitCheckStore.clearInitialCheck(walletId: id)
             splitCheckMessage = "No spendable coins to check."
             return
         }
         let results = await service.statuses(for: candidates)
         splitCheckStore.merge(results, walletId: id)
+        let unknown = results.values.filter { $0 == .unknown }.count
+        // Done only when Bitcoin answered for every coin; otherwise the next sync tries again.
+        if unknown == 0 { splitCheckStore.clearInitialCheck(walletId: id) }
+        guard selectedWalletId == id else { return }   // switched away mid-check
         splitSummary = try? splitSummaryUsingCachedChecks(walletId: id)
 
         let shared = results.values.filter { $0 == .shared }.count
-        let unknown = results.values.filter { $0 == .unknown }.count
         if shared > 0 {
             splitCheckMessage = shared == 1
                 ? "1 coin is still shared with Bitcoin and needs splitting."
@@ -1260,6 +1270,28 @@ final class AppState {
         } else {
             splitCheckMessage = "No coins are shared with Bitcoin."
         }
+    }
+
+    /// "Last checked …" for the selected wallet's Bitcoin check, or nil if it's never been checked.
+    /// A check is a snapshot — coins received since aren't covered — so its age is part of the answer.
+    /// Whole days only, built by hand: relative date formatters are unverified on Fuse-Android.
+    var splitLastCheckedText: String? {
+        guard let id = selectedWalletId,
+              let checked = splitCheckStore.lastCheckedEpochSeconds(walletId: id) else { return nil }
+        let days = max(0, (Int(Date().timeIntervalSince1970) - checked) / 86_400)
+        switch days {
+        case 0: return "Last checked today"
+        case 1: return "Last checked yesterday"
+        default: return "Last checked \(days) days ago"
+        }
+    }
+
+    /// Owe `wallet` one automatic Bitcoin check, run after its next successful sync. Only for imports
+    /// and copies on a fork network: those can hold coins inherited from Bitcoin. A newly created
+    /// seed can't, so create skips it.
+    private func scheduleInitialSplitCheck(for wallet: ManagedWallet) {
+        guard wallet.network.supportsCoinSplit else { return }
+        splitCheckStore.markNeedsInitialCheck(walletId: wallet.id)
     }
 
     /// Clear state that belongs to the outgoing wallet so it can never bleed into the next
@@ -1335,8 +1367,14 @@ final class AppState {
             balance = updated
             pendingBalance = (try? walletOps.pendingBalance(walletId: id)) ?? .zero
             transactions = sorted((try? walletOps.transactions(walletId: id)) ?? [])
-            // Coin-split status (local, no I/O) — drives the Home nudge. eCash only; nil elsewhere.
-            splitSummary = (selectedWallet?.network.supportsCoinSplit == true) ? (try? walletOps.splitSummary(walletId: id)) : nil
+            // Coin-split status from Bitcoin's stored answers (local, no I/O) — drives the Home nudge.
+            // eCash only; nil elsewhere.
+            splitSummary = (selectedWallet?.network.supportsCoinSplit == true) ? (try? splitSummaryUsingCachedChecks(walletId: id)) : nil
+            // An imported or copied wallet's one automatic Bitcoin check, now that its coins are known.
+            // Not awaited: it's a request per coin to another chain's explorer, and the sync is done.
+            if selectedWallet?.network.supportsCoinSplit == true, splitCheckStore.needsInitialCheck(walletId: id) {
+                Task { await self.checkSplittableCoins() }
+            }
             syncState = .idle
             // Refresh fiat alongside the balance (no-op for networks without a price provider).
             Task { await refreshPrice() }

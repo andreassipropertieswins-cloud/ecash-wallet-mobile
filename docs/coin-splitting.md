@@ -1,7 +1,7 @@
 # Coin splitting — how we detect and separate shared coins
 
 **Status:** 🟢 BUILT. Splitting proven on-chain (drynet3, 2026-07-28); the Bitcoin-backed detection
-check shipped 2026-08-24. This is the app's most consequential money feature — read §4 before
+check shipped 2026-08-24, and became the only detection 2026-10-10 (§3). This is the app's most consequential money feature — read §4 before
 changing any of it.
 
 Related: `docs/key-derivation.md` (eCash = Bitcoin params — the root cause), CLAUDE.md §6
@@ -41,21 +41,13 @@ nil for Bitcoin and Signet, where stamping it would make transactions unminable.
 (`nLockTime = 0`) is perfectly valid on eCash, so *spending BTC can still replay onto eCash* until
 the coins are split. That's the whole reason the feature exists.
 
-## 3. Detection — two steps
+## 3. Detection — ask Bitcoin (no height heuristic)
 
-### Step 1: block height (free, every sync)
+> **Revised 2026-10-10.** Detection used to have a free Step 1 that flagged every coin confirmed
+> below the fork height, with the Bitcoin check as an on-demand Step 2. That heuristic is gone (§4
+> explains why it's unsound): **only an answer from Bitcoin flags a coin.**
 
-A coin confirmed **below** the network's fork height predates the split, so it's shared. Runs on
-every sync, costs nothing, and drives the Home nudge and the Settings row.
-
-Fork height comes from the remote config (`WalletManager.effectiveForkHeight`), because it moves per
-dry-run chain — alphanet **963,648**, drynet4 961,632 — and pinning it in the binary would
-misclassify every coin confirmed between two heights after a rollover.
-
-### Step 2: ask Bitcoin (on demand)
-
-**Settings → Check for splittable coins.** For each spendable coin we ask a Bitcoin backend about
-that exact outpoint:
+For each spendable coin we ask a Bitcoin Esplora about that exact outpoint:
 
 | Bitcoin's answer | Verdict |
 |---|---|
@@ -63,8 +55,23 @@ that exact outpoint:
 | Knows it, output **unspent** | live on both chains → **needs splitting** |
 | Knows it, output **already spent** | a replay would be a double-spend → **separated** |
 
-On demand rather than automatic: it's a request per coin against a chain the wallet otherwise never
-contacts, and it hands that operator the wallet's addresses.
+**When it runs:**
+- **Once automatically**, after the first successful sync of a wallet **imported** (phrase or WIF,
+  including investor claims) or **copied** onto an eCash network. Those are the wallets that can hold
+  coins inherited from Bitcoin; a newly created seed can't, so create skips it. The owed check is a
+  flag in `SplitCheckStore` (`markNeedsInitialCheck`), cleared only when Bitcoin answered for every
+  coin, so an import made offline or during an explorer outage is checked on a later sync.
+- **Otherwise only from Settings → Check for splittable coins**, which shows "Last checked …".
+
+Not on every sync: it's a request per coin against a chain the wallet otherwise never contacts, and
+it hands that operator the wallet's txids. Coins received after the last check aren't covered until
+the user checks again.
+
+Only eCash networks (`supportsCoinSplit`: alphanet, betanet) ever run it — never Bitcoin, L2L
+Signet or Thunder.
+
+The fork height (`WalletManager.effectiveForkHeight`) is still used, but only to mark pre-fork
+transactions in history.
 
 ### Three states, not two
 
@@ -150,15 +157,16 @@ only supplies the local UTXO list.
 - Splitting is **eCash-only** and pays a fresh address of the **same wallet**, so the user keeps
   control on both chains.
 - Results are **point-in-time**: someone can spend the Bitcoin side afterwards.
-- The check **reveals the wallet's addresses to a Bitcoin backend**. Same addresses either chain, but
-  a different operator learning them — which is why it's a button, not automatic.
+- The check **reveals the wallet's txids to a Bitcoin backend** — which is why it runs once per
+  import/copy and otherwise only from the button, never on every sync.
 
 ## 9. Known gaps
 
 1. **The bundled fallback is stale.** `NetworkRegistry` still hardcodes drynet3 —
    `defaultBackend: esplora.drynet3.drivechain.dev`, `displayName: "Drynet3"`, `forkHeight 957_600`
    — while the config has rolled to alphanet (963,648). Harmless while the remote fetch succeeds
-   (remote wins), but an offline first launch classifies against a height ~6,000 blocks wrong.
+   (remote wins), but an offline first launch marks history against a height ~6,000 blocks wrong.
+   (Splitting no longer depends on it.)
 2. **No batching.** One or two requests per coin; a wallet with hundreds of UTXOs makes a lot of
    them. `/address/{addr}/utxo` intersected against our set would be O(addresses) instead.
 3. **No automatic re-check** after a split, though the summary is recomputed from cache.

@@ -26,6 +26,7 @@ struct SplitCheckStore {
     // changing the key discards them instead of leaving stale "needs splitting" on screen.
     private static let key = "split.check.results.v2"
     private static let checkedAtKey = "split.check.checkedAt.v2"
+    private static let pendingKey = "split.check.pendingInitial"
 
     private var all: [String: [String: String]] {
         get {
@@ -73,12 +74,28 @@ struct SplitCheckStore {
         return stored > 0 ? stored : nil
     }
 
+    /// Wallets owed their one automatic check: set on import / copy-to-network, cleared once a check
+    /// gets an answer from Bitcoin for every coin. Kept until then so an import made offline (or while
+    /// the explorer is down) is still checked on a later sync, not silently skipped.
+    func markNeedsInitialCheck(walletId: String) {
+        UserDefaults.standard.set(true, forKey: "\(Self.pendingKey).\(walletId)")
+    }
+
+    func needsInitialCheck(walletId: String) -> Bool {
+        UserDefaults.standard.bool(forKey: "\(Self.pendingKey).\(walletId)")
+    }
+
+    func clearInitialCheck(walletId: String) {
+        UserDefaults.standard.removeObject(forKey: "\(Self.pendingKey).\(walletId)")
+    }
+
     /// Purge on wallet removal (Golden Rule §5).
     func forget(walletId: String) {
         var everything = all
         everything.removeValue(forKey: walletId)
         all = everything
         UserDefaults.standard.removeObject(forKey: "\(Self.checkedAtKey).\(walletId)")
+        clearInitialCheck(walletId: walletId)
     }
 
     /// Outpoint keys by verdict, in the shape `splitSummary(knownShared:knownSafe:)` wants.

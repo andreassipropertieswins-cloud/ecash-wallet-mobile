@@ -182,6 +182,7 @@ public enum NetworkRegistry {
     static func replayProtectionLockHeight(for network: WalletNetwork) -> UInt32? {
         switch network {
         case .ecash, .ecashBeta: return UInt32(499_999_999)   // LOCKTIME_THRESHOLD - 1
+        // The real eCash mainnet case, when added, uses 499_999_998 (one lower) — NOT this value.
         case .bitcoin, .signet, .thunder: return nil
         }
     }
@@ -197,16 +198,17 @@ public enum NetworkRegistry {
     /// nothing about the transaction beyond making the guarantee ours.
     static let replayProtectionSequence: UInt32 = UInt32(0xFFFF_FFFD)
 
-    /// The **fork height** for coin-splitting: coins confirmed BELOW this block are pre-fork (shared
-    /// with the other chain → need splitting); at/above it, coins are chain-specific (post-fork, replay-
-    /// safe). `.ecash` is **alphanet → 963_648** and `.ecashBeta` is **betanet → 967_680**; the real eCash
-    /// mainnet fork is block **964_000** (CLAUDE.md). nil where splitting
-    /// doesn't apply (Bitcoin/Signet/Thunder). Internal: used by `WalletEngine.splitSummary`.
+    /// The **fork height**: transactions confirmed BELOW this block are pre-fork (inherited from
+    /// Bitcoin), used to mark them in history. Coin-splitting no longer classifies by height — it asks
+    /// Bitcoin's explorer (`SplitSummary.classify`). `.ecash` is **alphanet → 963_648** and
+    /// `.ecashBeta` is **betanet → 967_680**; the real eCash mainnet fork is block **964_000**
+    /// (CLAUDE.md). nil for non-forks (Bitcoin/Signet/Thunder). Internal: used by
+    /// `WalletEngine.transactions`.
     static func forkHeight(for network: WalletNetwork) -> Int64? {
         switch network {
         // Fallbacks only — the live values come from the remote config per chain, which is what
-        // makes a rollover safe. They differ per chain and misclassifying is a money bug, so they
-        // are NOT shared between the two eCash networks.
+        // makes a rollover safe. They differ per chain, so they are NOT shared between the two
+        // eCash networks.
         case .ecash: return Int64(963_648)       // alphanet
         case .ecashBeta: return Int64(967_680)   // betanet
         case .bitcoin, .signet, .thunder: return nil

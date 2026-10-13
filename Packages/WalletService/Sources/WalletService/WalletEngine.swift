@@ -208,7 +208,7 @@ public final class WalletEngine: WalletEngineProtocol {
         // Build into a Swift array (not `.map`): a `.map` over the Kotlin `List` bdk-android
         // returns produces a Kotlin `List`, which mismatches our `[WalletTx]` (Skip `Array`).
         var result: [WalletTx] = []
-        // Same boundary split-coins classifies against (remote config first, bundled fallback).
+        // The fork boundary (remote config first, bundled fallback) — marks pre-fork history.
         let forkHeight = WalletManager.effectiveForkHeight(for: network)
         let ownOutputs = ownOutputKeys()
         for canonical in wallet.transactions() {
@@ -572,32 +572,25 @@ public final class WalletEngine: WalletEngineProtocol {
         }
     }
 
-    /// Read-only split status: total spendable vs how much is pre-fork (needs splitting). Classifies
-    /// each spendable UTXO by its confirmation height against `NetworkRegistry.forkHeight`. Excludes
-    /// untrusted 0-conf (not drainable), matching what `splitToSelf` would actually move.
+    /// Read-only split status with nothing checked yet: every coin is unverified, nothing needs
+    /// splitting. Excludes untrusted 0-conf (not drainable), matching what `splitToSelf` would move.
     public func splitSummary() throws -> SplitSummary {
         try splitSummary(knownShared: [], knownSafe: [])
     }
 
-    /// As above, but with outpoints already resolved against the other chain — "txid:vout" keys.
-    /// See `SplitSummary.classify` for why those override the height heuristic in both directions.
+    /// As above, with outpoints Bitcoin's explorer has already answered for — "txid:vout" keys.
+    /// Those answers are the only thing that classifies a coin (`SplitSummary.classify`).
     public func splitSummary(knownShared: [String], knownSafe: [String]) throws -> SplitSummary {
-        // Remote-config value when the app has applied one, else the bundled default. The height
-        // differs per dry-run chain (drynet2/3 957_600, drynet4 961_632), so pinning it here would
-        // misclassify after a config-driven rollover.
-        let fork = WalletManager.effectiveForkHeight(for: network)
         var untrustedKeys = Set<String>()
         for op in untrustedUnconfirmedOutpoints() { untrustedKeys.insert("\(op.txid):\(op.vout)") }
         var spendable: [SplitUtxo] = []
         for out in wallet.listUnspent() {
             if untrustedKeys.contains("\(out.outpoint.txid):\(out.outpoint.vout)") { continue }
-            spendable.append(SplitUtxo(height: confirmationHeight(of: out),
-                                       sats: Int64(out.txout.value.toSat()),
+            spendable.append(SplitUtxo(sats: Int64(out.txout.value.toSat()),
                                        txid: "\(out.outpoint.txid)",
                                        vout: Int32(out.outpoint.vout)))
         }
-        return SplitSummary.classify(spendable, forkHeight: fork,
-                                     knownShared: knownShared, knownSafe: knownSafe)
+        return SplitSummary.classify(spendable, knownShared: knownShared, knownSafe: knownSafe)
     }
 
     /// The spendable UTXOs a split would move — the exact set the on-chain check asks Bitcoin about.
@@ -646,24 +639,6 @@ public final class WalletEngine: WalletEngineProtocol {
         // Persist so the widened window survives a restart — otherwise every cold start narrows it
         // back and the same deposit goes missing again.
         if revealed { _ = try? wallet.persist(persister: persister) }
-    }
-
-    /// The confirmation block height of a UTXO, or nil if unconfirmed. ChainPosition diverges (Swift
-    /// enum with associated values vs Kotlin sealed class) — same split as `transactions()`.
-    private func confirmationHeight(of output: LocalOutput) -> Int64? {
-        #if SKIP
-        if let confirmed = output.chainPosition as? ChainPosition.Confirmed {
-            return Int64(confirmed.confirmationBlockTime.blockId.height)
-        }
-        return nil
-        #else
-        switch output.chainPosition {
-        case .confirmed(let confirmationBlockTime, _):
-            return Int64(confirmationBlockTime.blockId.height)
-        case .unconfirmed:
-            return nil
-        }
-        #endif
     }
 
     /// The shared tail of `send`/`sweep`: sign the built PSBT on demand, broadcast it, fold it into the

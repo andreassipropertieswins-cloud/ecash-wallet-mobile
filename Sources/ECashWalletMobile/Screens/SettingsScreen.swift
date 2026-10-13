@@ -43,8 +43,8 @@ struct SettingsScreen: View {
                         }
                     }
 
-                    // Split coins — eCash only, and only when the wallet actually holds pre-fork coins
-                    // (shared with Bitcoin). No row when there's nothing to split.
+                    // Split coins — eCash only, and only when a Bitcoin check found coins still live
+                    // on Bitcoin (shared). No row when there's nothing to split.
                     if wallet.network.supportsCoinSplit, let summary = app.splitSummary, summary.needsSplitCount > 0 {
                         Button { showSplit = true } label: {
                             HStack {
@@ -64,8 +64,8 @@ struct SettingsScreen: View {
                     // Ask Bitcoin directly whether this wallet's coins still exist there. On
                     // demand, not automatic: it's a request per coin against a chain this wallet
                     // otherwise never contacts, and it reveals these addresses to that operator.
-                    // Shown for every eCash wallet, not just ones the height heuristic flagged —
-                    // the whole point is that the heuristic can say "nothing to split" and be wrong.
+                    // Shown for every eCash wallet: it's the only way coins get flagged, apart from
+                    // the one automatic check after an import or copy.
                     if wallet.network.supportsCoinSplit {
                         Button { Task { await app.checkSplittableCoins() } } label: {
                             HStack {
@@ -87,6 +87,11 @@ struct SettingsScreen: View {
 
                         if let message = app.splitCheckMessage {
                             Text(verbatim: message)
+                                .textStyle(.xs)
+                                .foregroundStyle(Theme.Colors.text2)
+                        }
+                        if !app.isCheckingSplittableCoins, let lastChecked = app.splitLastCheckedText {
+                            Text(verbatim: lastChecked)
                                 .textStyle(.xs)
                                 .foregroundStyle(Theme.Colors.text2)
                         }

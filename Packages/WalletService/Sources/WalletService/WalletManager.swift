@@ -387,9 +387,8 @@ public final class WalletManager: @unchecked Sendable {
     /// This must be remotely settable because the height moves as the dry-run chain rolls forward —
     /// drynet2/3 forked at 957_600, drynet4 at 961_632 — while our `.ecash` case stays put and the
     /// config repoints the backend by `family`. Pinning it in the binary would mean a rollover
-    /// silently classified coins against the PREVIOUS chain's fork, flagging everything confirmed
-    /// between the two heights as needing a split when it doesn't. Non-positive values are ignored so
-    /// a malformed payload can't move the boundary to zero and mark everything safe.
+    /// silently marked history against the PREVIOUS chain's fork. Non-positive values are ignored so
+    /// a malformed payload can't move the boundary to zero.
     public func setRemoteForkHeight(network: WalletNetwork, height: Int64) {
         guard height > 0 else { return }
         let defaults = UserDefaults.standard
@@ -655,13 +654,13 @@ public final class WalletManager: @unchecked Sendable {
         return try engine.splitToSelf(feeRate: feeRate)
     }
 
-    /// Read-only split status for a wallet (total spendable vs pre-fork amount that needs splitting).
+    /// Read-only split status for a wallet with no Bitcoin answers applied (everything unverified).
     public func splitSummary(walletId: String) throws -> SplitSummary {
         let engine = try liveEngine(walletId: walletId)
         return try engine.splitSummary()
     }
 
-    /// Split status with outpoints already resolved against the other chain ("txid:vout" keys).
+    /// Split status with outpoints already resolved against Bitcoin ("txid:vout" keys).
     public func splitSummary(walletId: String, knownShared: [String], knownSafe: [String]) throws -> SplitSummary {
         let engine = try liveEngine(walletId: walletId)
         return try engine.splitSummary(knownShared: knownShared, knownSafe: knownSafe)
