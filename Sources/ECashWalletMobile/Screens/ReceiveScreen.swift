@@ -7,7 +7,7 @@ import WalletService
 
 /// Receive screen for the selected wallet: the next unused address as a QR + monospace text, the
 /// network it belongs to (Golden Rule §6 — never hand out an address for the wrong network), and
-/// Share / New-address actions. Each visit reveals a fresh address (BDK advances + persists).
+/// Share / New-address actions (New address is hidden for single-key WIF wallets, which have one).
 struct ReceiveScreen: View {
     @Environment(AppState.self) var app
     @State var address: AddressInfo?   // not `private` — Fuse bridges @State to Compose (skip-fuse rule)
@@ -85,17 +85,22 @@ struct ReceiveScreen: View {
                     .frame(maxWidth: .infinity)
                 }
 
-                Button {
-                    Task { address = await app.nextReceiveAddress() }
-                    copied = false
-                } label: {
-                    HStack(spacing: Theme.Space.x1) {
-                        Image(icon: Icon.refresh).resizable().scaledToFit().frame(width: 14, height: 14)
-                        Text("New address", bundle: .module, comment: "receive: reveal a fresh address").textStyle(.sm)
+                // A WIF wallet is one key, so it has exactly one address: BDK hands back the same
+                // address at index 0 however often it's asked. The button did nothing there and
+                // suggested the wallet should have more.
+                if wallet.keyType != .wif {
+                    Button {
+                        Task { address = await app.nextReceiveAddress() }
+                        copied = false
+                    } label: {
+                        HStack(spacing: Theme.Space.x1) {
+                            Image(icon: Icon.refresh).resizable().scaledToFit().frame(width: 14, height: 14)
+                            Text("New address", bundle: .module, comment: "receive: reveal a fresh address").textStyle(.sm)
+                        }
+                        .foregroundStyle(Theme.Colors.text1)
                     }
-                    .foregroundStyle(Theme.Colors.text1)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 Spacer()
             }
