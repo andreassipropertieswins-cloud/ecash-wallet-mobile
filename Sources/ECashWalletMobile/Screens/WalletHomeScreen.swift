@@ -308,17 +308,43 @@ struct WalletHomeScreen: View {
     /// No "Buy"/"Swap" placeholders, even disabled: App Review read them as cryptocurrency exchange
     /// services (Guideline 3.1.5(iii)) and asked for exchange licences. Add them only with a
     /// licensed partner behind them.
+    ///
+    /// **Large text.** With the font or display size turned up, three icon+label buttons don't fit
+    /// and a label truncates ("Withdra"). The row is offered at a ladder of label sizes and
+    /// `ViewThatFits` takes the first that fits, so every button always shares ONE size — a
+    /// per-label `minimumScaleFactor` would shrink "Withdraw" more than "Send". Measured by the
+    /// platform, so it holds in every language (no character-count maths).
     private var actionButtons: some View {
+        ViewThatFits(in: .horizontal) {
+            actionRow(labelSize: 16)
+            actionRow(labelSize: 14)
+            actionRow(labelSize: 13)
+            actionRow(labelSize: 12)
+            actionRow(labelSize: 11)
+            // Last resort (largest font + display size): drop the icons so the words get the room.
+            actionRow(labelSize: 13, showsIcons: false)
+            actionRow(labelSize: 11, showsIcons: false)
+            actionRow(labelSize: 10, showsIcons: false)
+        }
+    }
+
+    /// The titles in this row, in order. Every button sizes itself to the WIDEST of them (see
+    /// `actionButton`), so the row's natural width is what the widest label needs in each button.
+    private var actionTitles: [LocalizedStringKey] {
+        isSidechainWallet ? ["Withdraw", "Receive", "Send"] : ["Receive", "Send"]
+    }
+
+    private func actionRow(labelSize: CGFloat, showsIcons: Bool = true) -> some View {
         HStack(spacing: Theme.Space.x3) {
             if isSidechainWallet {
-                actionButton(icon: Icon.sidechains, title: "Withdraw", prominent: false) {
+                actionButton(icon: Icon.sidechains, title: "Withdraw", prominent: false, labelSize: labelSize, showsIcon: showsIcons) {
                     showWithdraw = true
                 }
             }
-            actionButton(icon: Icon.receive, title: "Receive", prominent: false) {
+            actionButton(icon: Icon.receive, title: "Receive", prominent: false, labelSize: labelSize, showsIcon: showsIcons) {
                 showReceive = true
             }
-            actionButton(icon: Icon.send, title: "Send", prominent: true) {
+            actionButton(icon: Icon.send, title: "Send", prominent: true, labelSize: labelSize, showsIcon: showsIcons) {
                 app.beginSendFlow()   // drop any cached (finished) Send VM → fresh flow
                 sendToken += 1        // force a fresh SendScreen (new nav path) (see sendToken)
                 showSend = true
@@ -334,14 +360,34 @@ struct WalletHomeScreen: View {
     /// One action: icon + label in a full-width rounded button. Send (prominent) is accent-filled;
     /// the rest are the bordered secondary look shared with Receive's Copy/Share. Each wrapper takes
     /// `maxWidth: .infinity` so the row splits evenly (same reason as Receive's action row).
-    private func actionButton(icon: Icon, title: LocalizedStringKey, prominent: Bool,
-                              action: @escaping () -> Void) -> some View {
+    ///
+    /// Invisible, zero-height copies of every title in the row sit above the label, so each button's
+    /// natural width is the widest title's. That's what lets `ViewThatFits` judge the row correctly: the buttons split
+    /// the row evenly, so the widest label must fit in its share, not merely the sum of the labels.
+    private func actionButton(icon: Icon, title: LocalizedStringKey, prominent: Bool, labelSize: CGFloat,
+                              showsIcon: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: Theme.Space.x2) {
-                Image(icon: icon).resizable().scaledToFit().frame(width: 16, height: 16)
-                Text(title, bundle: .module).textStyle(.button).lineLimit(1)
+            VStack(spacing: 0) {
+                // Zero-height, invisible copies of every title, laid out like the real label: they
+                // set the width without moving this button's own icon away from its text.
+                ForEach(Array(actionTitles.enumerated()), id: \.offset) { _, widest in
+                    HStack(spacing: Theme.Space.x2) {
+                        if showsIcon { Color.clear.frame(width: 16, height: 0) }
+                        Text(widest, bundle: .module).font(.jbMono(labelSize, .semibold)).lineLimit(1)
+                            .frame(height: 0)
+                    }
+                    .opacity(0)
+                    .accessibilityHidden(true)
+                }
+                HStack(spacing: Theme.Space.x2) {
+                    if showsIcon {
+                        Image(icon: icon).resizable().scaledToFit().frame(width: 16, height: 16)
+                    }
+                    Text(title, bundle: .module).font(.jbMono(labelSize, .semibold)).lineLimit(1)
+                }
             }
             .foregroundStyle(prominent ? Theme.Colors.accentText : Theme.Colors.text0)
+            .padding(.horizontal, Theme.Space.x2)   // part of the measured width: labels never touch the edge
             .frame(maxWidth: .infinity)
             .padding(.vertical, Theme.Space.x3)
             .background(RoundedRectangle(cornerRadius: Theme.Radius.md)
