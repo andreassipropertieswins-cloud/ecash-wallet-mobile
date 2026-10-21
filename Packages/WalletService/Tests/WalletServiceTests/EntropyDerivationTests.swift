@@ -139,4 +139,32 @@ final class EntropyDerivationTests: XCTestCase {
         XCTAssertEqual(EntropyDerivation.hex(Data(bytes)), "000fa5ff")
         XCTAssertEqual(EntropyDerivation.hex(Data([UInt8]())), "")
     }
+
+    // MARK: - Device randomness (issue #20)
+
+    /// The head parse that `hasDeviceRandomness` rests on: the third component, exactly.
+    func testSystemComponentIsTheThirdComponent() {
+        let hex = String(repeating: "ab", count: 32)
+        let field = EntropyDerivation.field(wordCount: 12, systemHex: hex, timestampMillis: 1700000000000, userInput: "x&y&z")
+        XCTAssertEqual(EntropyDerivation.systemComponent(inField: field), hex)
+        // User-only shape: empty, not nil.
+        XCTAssertEqual(EntropyDerivation.systemComponent(inField: "v1&12&&0&hello"), "")
+        // Not a field at all.
+        XCTAssertNil(EntropyDerivation.systemComponent(inField: "hello"))
+        XCTAssertNil(EntropyDerivation.systemComponent(inField: "v1&12"))
+    }
+
+    /// A field the app generated passes; anything a person could have typed in its place does not.
+    func testDeviceRandomnessIsExactlySixtyFourLowercaseHex() {
+        let hex = String(repeating: "0f", count: 32)
+        XCTAssertTrue(EntropyDerivation.hasDeviceRandomness(field: "v1&12&" + hex + "&0&hello"))
+        XCTAssertTrue(EntropyDerivation.hasDeviceRandomness(field: "v1&24&" + hex + "&1700000000000&"))
+
+        XCTAssertFalse(EntropyDerivation.hasDeviceRandomness(field: "v1&12&&0&hello"))              // the brain wallet from #20
+        XCTAssertFalse(EntropyDerivation.hasDeviceRandomness(field: "v1&12&" + String(hex.dropLast()) + "&0&x"))   // 63
+        XCTAssertFalse(EntropyDerivation.hasDeviceRandomness(field: "v1&12&" + hex + "0&0&x"))      // 65
+        XCTAssertFalse(EntropyDerivation.hasDeviceRandomness(field: "v1&12&" + hex.uppercased() + "&0&x"))   // not what the app emits
+        XCTAssertFalse(EntropyDerivation.hasDeviceRandomness(field: "v1&12&" + String(repeating: "zz", count: 32) + "&0&x"))
+        XCTAssertFalse(EntropyDerivation.hasDeviceRandomness(field: "hello"))
+    }
 }

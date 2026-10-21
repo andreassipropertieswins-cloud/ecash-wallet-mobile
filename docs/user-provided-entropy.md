@@ -429,6 +429,14 @@ we should keep it.
 > the recovery phrase is the backup). The input box shows **the whole field** — opening prefilled with
 > `v1&<words>&<device hex>&<timestamp>&` — and swipes are appended. **Only a short minimum:** "Use this entropy" unlocks after
 > `nominalBits` of estimated swiping (128/256 — a few seconds), not a full bar, because the CSPRNG prefix alone is a full-strength 128/256-bit seed; the bar is guidance only
+> **Edited/pasted fields (issue #20, 2026-10-21):** the Edit sheet stays, so a saved field can be
+> pasted back to *prove* it makes the wallet it claims to. But an edited field is held to its own
+> rules: it must carry the 64-hex device-randomness component (`EntropyDerivation.hasDeviceRandomness`
+> — `v1&12&&0&hello` is a brain wallet and is refused with a reason), the meter is never green for it
+> (warning at best, "only as secret as the text itself"), and "Use this entropy" first asks the user
+> to claim it ("anyone who has this exact string has this wallet"). The last is the only defence
+> against "paste this to set up your wallet": a pasted field with a perfectly valid device component
+> is still fully known to whoever supplied it.
 > (it still measures the user's swiping alone and turns green at the old target). The `shasum` recipe
 > moved to the seed-preview screen. Field format and derivation (§3–§4) are unchanged, so existing
 > audits still work. The original design below is kept for history.
@@ -689,7 +697,8 @@ person's velocity is consistent enough that dwell is worth less than assumed.
 The meter now reads `est. 153/128 bits` with a mode-dependent caveat beneath it. **The asymmetry is the
 point:** in mixed mode the CSPRNG contributes its full 128/256 regardless, so the wallet is at least as
 strong as a normal one no matter how wrong the model is — the estimate only measures what the user is
-*adding*. In user-only mode the estimate is the entire security, and that line is warning-coloured.
+*adding*. (User-only mode no longer exists: a field with an empty device component is refused on the
+create path since 2026-10-21 — see §7, issue #20.)
 
 ## 11. Build order
 

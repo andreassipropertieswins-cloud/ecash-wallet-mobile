@@ -13,8 +13,11 @@ import WalletService
 ///
 /// **Always mixed, always swipe** (2026-10-08). The device's CSPRNG prefix is in every field and the
 /// user adds to it by swiping. The earlier options screen (mixed vs "only mine", swipe vs typed) is
-/// gone. Editing the string by hand (`applyEdit`) is the way to paste a saved field back in, to test
-/// or to reproduce a wallet.
+/// gone. Editing the string by hand (`applyEdit`) is the way to paste a saved field back in — to prove
+/// that the string on screen makes the wallet it claims to, or to reproduce one. **An edited field is
+/// held to its own rules (issue #20):** it must carry the device-randomness component (a field without
+/// one is a brain wallet, and the app has not produced one since 2026-10-08), it is never shown as
+/// green, and the user must own it before a wallet is made — whoever wrote the string has the wallet.
 ///
 /// Owns the two components the user cannot type — the CSPRNG prefix and the timestamp — and **freezes
 /// both when the screen opens**. That is not incidental: the audit story is "hash the string you see",
@@ -170,14 +173,36 @@ final class EntropyViewModel {
     /// Whether the user has swiped enough to go on. Short of a full bar is fine (2026-10-08).
     var hasMinimumInput: Bool { estimatedBits >= minimumBits }
 
+    /// Why an edited field can't go on, or nil when it can.
+    enum EditedFieldProblem: Equatable {
+        /// Doesn't start `v1&12&` / `v1&24&`, so nothing can be derived from it.
+        case notAField
+        /// Well-formed, but the device-randomness component isn't 64 hex characters: the wallet would
+        /// be only as secret as the user's text (`v1&12&&0&hello` is a brain wallet). Refused (#20).
+        case noDeviceRandomness
+    }
+
+    /// What stops an edited field, or nil for a generated one or an edited one that passes.
+    var editedFieldProblem: EditedFieldProblem? {
+        guard isEdited else { return nil }
+        if entropyHex == nil { return .notAField }
+        if !EntropyDerivation.hasDeviceRandomness(field: field) { return .noDeviceRandomness }
+        return nil
+    }
+
+    /// An edited field needs the user to claim it before a wallet is made from it: whoever wrote the
+    /// string has the wallet, so "paste this to set up your wallet" hands the seed to whoever sent it.
+    /// The view puts an explicit gate behind this.
+    var needsOwnershipAcknowledgement: Bool { isEdited }
+
     /// Needs a live session (an empty system component — a wiped session that hasn't restarted —
     /// would leave a field of nothing but swipes) and the minimum swiping.
     ///
-    /// **An edited field skips both**, deliberately, as importing a recovery phrase does: editing is
-    /// how a saved field is pasted back to reproduce its wallet, which must work as written. It only
-    /// has to be a well-formed field.
+    /// **An edited field skips the swipe minimum**, as importing a recovery phrase does: it is a saved
+    /// field pasted back to reproduce its wallet, which must work as written. It must still be a
+    /// well-formed field that carries device randomness (`editedFieldProblem`).
     var canContinue: Bool {
-        if isEdited { return entropyHex != nil }
+        if isEdited { return editedFieldProblem == nil }
         return !systemHex.isEmpty && entropyHex != nil && hasMinimumInput
     }
 

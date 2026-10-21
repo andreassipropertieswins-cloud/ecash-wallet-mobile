@@ -255,12 +255,42 @@ import Foundation
         #expect(restored.entropyHex == expected)
     }
 
-    /// The editor is for testing and restoring, so the swipe minimum doesn't apply.
+    /// The editor is for proving and restoring, so the swipe minimum doesn't apply — to a field that
+    /// carries device randomness.
     @Test func anEditedFieldSkipsTheSwipeMinimum() {
-        let vm = viewModel()
-        vm.applyEdit("v1&12&&0&abc")
+        let saved = viewModel().field + "abc"
+        let vm = viewModel(clock: 999)
+        vm.applyEdit(saved)
         #expect(!vm.hasMinimumInput)
+        #expect(vm.editedFieldProblem == nil)
         #expect(vm.canContinue)
+    }
+
+    /// Issue #20: `v1&12&&0&hello` is a well-formed field whose only secret is "hello" — a brain
+    /// wallet. An edited field without the 64-hex device component is refused, and says why.
+    @Test func anEditedFieldWithoutDeviceRandomnessIsRefused() {
+        let vm = viewModel()
+        vm.applyEdit("v1&12&&0&hello")
+        #expect(vm.isEdited)
+        #expect(vm.entropyHex != nil)                       // derivable, which is exactly the trap
+        #expect(vm.editedFieldProblem == .noDeviceRandomness)
+        #expect(!vm.canContinue)
+
+        vm.applyEdit("v1&12&" + String(repeating: "f", count: 63) + "&0&hello")
+        #expect(vm.editedFieldProblem == .noDeviceRandomness)
+        #expect(!vm.canContinue)
+    }
+
+    /// Whoever wrote a pasted string has the wallet, so an edited field — even a valid one — needs the
+    /// user to claim it before a wallet is made; a generated one does not.
+    @Test func anEditedFieldNeedsOwnershipAcknowledgement() {
+        let vm = viewModel()
+        fill(vm)
+        #expect(!vm.needsOwnershipAcknowledgement)
+        vm.applyEdit(viewModel(clock: 999).field + "abc")
+        #expect(vm.needsOwnershipAcknowledgement)
+        vm.clear()
+        #expect(!vm.needsOwnershipAcknowledgement)
     }
 
     /// …but it must still be a field: anything not starting `v1&12&` / `v1&24&` can't be derived.
@@ -269,6 +299,7 @@ import Foundation
         vm.applyEdit("just some text")
         #expect(vm.isEdited)
         #expect(vm.entropyHex == nil)
+        #expect(vm.editedFieldProblem == .notAField)
         #expect(!vm.canContinue)
     }
 

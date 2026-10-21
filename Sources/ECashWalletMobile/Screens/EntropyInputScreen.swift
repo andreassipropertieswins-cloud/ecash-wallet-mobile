@@ -26,6 +26,8 @@ struct EntropyInputScreen: View {
     @State var isEditing = false
     @State var editText = ""
     @State var copied = false   // not `private` — Fuse bridges @State to Compose (skip-fuse rule)
+    @State var showEditedGate = false   // the "anyone with this string has this wallet" gate (#20)
+    @State var goToPreview = false
 
     /// `model` comes from the session New wallet's Continue created, which already drew this session's
     /// device randomness and timestamp.
@@ -45,6 +47,28 @@ struct EntropyInputScreen: View {
         // user ever arrived.
         .onAppear { vm.beginSessionIfNeeded() }
         .sheet(isPresented: $isEditing) { editSheet }
+        // Goes to the seed preview rather than creating: the user sees the words before committing.
+        .navigationDestination(isPresented: $goToPreview) {
+            EntropySeedPreviewScreen(field: vm.field, wordCount: vm.effectiveWordCount,
+                                     onConfirm: onComplete)
+        }
+        // An edited field only goes on once the user claims it. Whoever wrote the string has the
+        // wallet, so a pasted one from anyone else is theirs, not the user's (#20).
+        .alert(Text("Make a wallet from pasted text?", bundle: .module,
+                    comment: "edited entropy: ownership gate title"),
+               isPresented: $showEditedGate) {
+            Button(role: .cancel) { } label: {
+                Text("Cancel", bundle: .module, comment: "edited entropy: cancel the ownership gate")
+            }
+            Button(role: .destructive) {
+                goToPreview = true
+            } label: {
+                Text("I wrote it myself", bundle: .module, comment: "edited entropy: confirm ownership")
+            }
+        } message: {
+            Text("Anyone who has this exact string has this wallet. Continue only if you wrote it yourself and nobody else has seen it.",
+                 bundle: .module, comment: "edited entropy: ownership gate body")
+        }
         // NO `.onDisappear { vm.wipe() }`. It fires when the seed preview is pushed on TOP of this
         // screen, not only when the flow is left — so going forward to look at your words wiped them,
         // and coming back handed you a fresh session. A minute of swiping lost for having checked.
@@ -218,10 +242,8 @@ struct EntropyInputScreen: View {
     }
 
     private var continueButton: some View {
-        NavigationLink {
-            // Goes to the seed preview rather than creating: the user sees the words before committing.
-            EntropySeedPreviewScreen(field: vm.field, wordCount: vm.effectiveWordCount,
-                                     onConfirm: onComplete)
+        Button {
+            if vm.needsOwnershipAcknowledgement { showEditedGate = true } else { goToPreview = true }
         } label: {
             Text("Use this entropy", bundle: .module, comment: "continue to the seed preview")
                 .textStyle(.button)
@@ -240,12 +262,13 @@ struct EntropyInputScreen: View {
 
     // MARK: - Edit
 
-    /// The whole string in a text editor — paste a saved one to reproduce its wallet, or change it to
-    /// test. Saved as written (`EntropyViewModel.applyEdit`); the swipe minimum doesn't apply to it.
+    /// The whole string in a text editor — paste a saved one to reproduce (prove) its wallet, or change
+    /// it to test. Saved as written (`EntropyViewModel.applyEdit`); the swipe minimum doesn't apply,
+    /// but it must carry device randomness, is never shown green, and is gated on ownership (#20).
     private var editSheet: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: Theme.Space.x3) {
-                Text("This is exactly what gets hashed. Paste a saved string to get the same wallet again.",
+                Text("This is exactly what gets hashed. Paste a string you saved to get the same wallet again — and only one you wrote yourself: anyone who has it has the wallet.",
                      bundle: .module, comment: "entropy edit sheet explanation")
                     .textStyle(.xs)
                     .foregroundStyle(Theme.Colors.text1)
@@ -280,13 +303,17 @@ struct EntropyInputScreen: View {
 
     /// What to do, and the reassurance that the device is contributing too.
     private var instructionText: String {
-        "Swipe over the box randomly for a few seconds to continue, or until the bar fills. The more the better — it's mixed with the device's randomness."
+        if vm.isEdited {
+            return "This wallet will be exactly as secret as the pasted string. Anyone who has it has the wallet — only use a string you wrote yourself."
+        }
+        return "Swipe over the box randomly for a few seconds to continue, or until the bar fills. The more the better — it's mixed with the device's randomness."
     }
 
     /// Red until the minimum swiping (the button is still off), amber once it can continue, green
     /// when the bar is full.
     private var meterColor: Color {
-        if vm.isEdited { return vm.canContinue ? Theme.Colors.positive : Theme.Colors.negative }
+        // Never green for an edited field: the meter can't vouch for text the user brought (#20).
+        if vm.isEdited { return vm.canContinue ? Theme.Colors.warning : Theme.Colors.negative }
         if !vm.hasMinimumInput { return Theme.Colors.negative }
         if !vm.isFull { return Theme.Colors.warning }
         return Theme.Colors.positive
@@ -300,9 +327,14 @@ struct EntropyInputScreen: View {
     /// about a process, ours is a model of human behaviour.
     private var statusText: String? {
         if vm.isEdited {
-            return vm.canContinue
-                ? "Using your edited string · \(vm.effectiveWordCount) words"
-                : "Must start with v1&12& or v1&24&"
+            switch vm.editedFieldProblem {
+            case .none:
+                return "Pasted string · \(vm.effectiveWordCount) words · only as secret as the text itself"
+            case .some(.notAField):
+                return "Must start with v1&12& or v1&24&"
+            case .some(.noDeviceRandomness):
+                return "No device randomness — the third part must be 64 hex characters"
+            }
         }
         switch vm.rejection {
         case .none:

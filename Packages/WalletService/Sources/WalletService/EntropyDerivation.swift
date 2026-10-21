@@ -100,6 +100,36 @@ public enum EntropyDerivation {
         return count
     }
 
+    /// The device-randomness component of a complete field — the third, between the word count and
+    /// the timestamp — or nil if `text` isn't a field. The same leading parse as `wordCount(inField:)`;
+    /// empty for a user-only field (which the app stopped producing on 2026-10-08).
+    public static func systemComponent(inField text: String) -> String? {
+        guard isField(text) else { return nil }
+        var rest = String(text.dropFirst(version.count + separator.count))
+        guard let afterWordCount = rest.range(of: separator) else { return nil }
+        rest = String(rest[afterWordCount.upperBound..<rest.endIndex])
+        guard let afterSystem = rest.range(of: separator) else { return nil }
+        return String(rest[rest.startIndex..<afterSystem.lowerBound])
+    }
+
+    /// Whether a field carries the device's randomness: a system component of exactly 64 lowercase
+    /// hex characters, the SHA-256 of 32 CSPRNG bytes that `EntropyViewModel` puts there.
+    ///
+    /// A field without one is only as secret as its user text — a brain wallet. The app has produced
+    /// no such field since 2026-10-08, so one arriving through the editor was written by hand, and the
+    /// create path refuses it (issue #20). Lowercase only: that is the one spelling the app emits, and
+    /// accepting variants would only widen what a hand-written field can look like.
+    public static func hasDeviceRandomness(field: String) -> Bool {
+        guard let component = systemComponent(inField: field), component.count == 64 else { return false }
+        // Over UTF-8 bytes (ASCII, since the alphabet is): `unicodeScalars` doesn't transpile.
+        for byte in Array(component.utf8) {
+            let isDigit = byte >= UInt8(48) && byte <= UInt8(57)        // 0-9
+            let isHexLetter = byte >= UInt8(97) && byte <= UInt8(102)   // a-f
+            if !isDigit && !isHexLetter { return false }
+        }
+        return true
+    }
+
     // MARK: - Derivation
 
     /// Entropy byte count for a word count: 16 bytes (128 bits) for 12 words, 32 (256) for 24.
