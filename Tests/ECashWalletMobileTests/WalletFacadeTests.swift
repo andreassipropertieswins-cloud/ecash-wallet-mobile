@@ -20,6 +20,7 @@ import WalletService
 
         func balance(walletId: String) throws -> Amount { calls.append("balance:\(walletId)"); return Amount(sats: tag == "thunder" ? 2 : 1) }
         func pendingBalance(walletId: String) throws -> Amount { calls.append("pending:\(walletId)"); return Amount(sats: 0) }
+        func pendingChange(walletId: String) -> Amount { calls.append("change:\(walletId)"); return Amount(sats: 0) }
         func sync(walletId: String) async throws -> Amount { calls.append("sync:\(walletId)"); return Amount(sats: 0) }
         func receiveAddress(walletId: String, unused: Bool) async throws -> AddressInfo {
             calls.append("recv:\(walletId):\(unused)"); return AddressInfo(address: tag, index: 0)

@@ -20,11 +20,17 @@ struct ThunderScan {
     /// accumulator, which only holds CONFIRMED coins, so spending one of these is rejected until the
     /// next Thunder block ("utreexo error (Could not find node)", seen live 2026-09-30).
     let pendingSats: UInt64
+    /// The part of `pendingSats` that is our OWN change: unconfirmed outputs of transactions this
+    /// wallet funded. Shown apart from incoming payments so a send doesn't look like the rest of the
+    /// balance left — it's coming back, it just can't be spent until the next block.
+    let pendingChangeSats: UInt64
 
-    init(utxos: [ThunderPointedOutput], transactions: [WalletTx], pendingSats: UInt64 = 0) {
+    init(utxos: [ThunderPointedOutput], transactions: [WalletTx], pendingSats: UInt64 = 0,
+         pendingChangeSats: UInt64 = 0) {
         self.utxos = utxos
         self.transactions = transactions
         self.pendingSats = pendingSats
+        self.pendingChangeSats = min(pendingChangeSats, pendingSats)
     }
 
     static let empty = ThunderScan(utxos: [], transactions: [])

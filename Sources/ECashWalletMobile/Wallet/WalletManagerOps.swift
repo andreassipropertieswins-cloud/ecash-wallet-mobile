@@ -16,6 +16,7 @@ final class WalletManagerOps: WalletOps {
 
     func balance(walletId: String) throws -> Amount { try manager.balance(walletId: walletId) }
     func pendingBalance(walletId: String) throws -> Amount { try manager.pendingBalance(walletId: walletId) }
+    func pendingChange(walletId: String) -> Amount { .zero }   // BDK counts own change as spendable
     func sync(walletId: String) async throws -> Amount { try await manager.sync(walletId: walletId) }
     func rescan(walletId: String) async throws -> Amount { try await manager.rescan(walletId: walletId) }
     func balanceAsync(walletId: String) async throws -> Amount { try await manager.balanceAsync(walletId: walletId) }

@@ -21,6 +21,9 @@ import WalletService
 protocol WalletOps {
     func balance(walletId: String) throws -> Amount
     func pendingBalance(walletId: String) throws -> Amount
+    /// The part of `pendingBalance` that is the wallet's own change waiting for a block. Only Thunder
+    /// has any: BDK wallets already count their own unconfirmed change as spendable.
+    func pendingChange(walletId: String) -> Amount
     func sync(walletId: String) async throws -> Amount
     func rescan(walletId: String) async throws -> Amount
     func balanceAsync(walletId: String) async throws -> Amount

@@ -225,12 +225,25 @@ struct WalletHomeScreen: View {
                         .font(.jbMono(14, .regular))
                         .foregroundStyle(Theme.Colors.text2)
                 }
-                // Incoming unconfirmed (0-conf) — not yet spendable; shown so it doesn't look lost.
+                // Not yet spendable, shown so it doesn't look lost. Our own change (Thunder: a send's
+                // change waits for the next block) is told apart from incoming payments, so a send
+                // doesn't look like the rest of the balance left.
                 if !app.balanceHidden, app.pendingBalance.sats > 0 {
-                    Text("+\(app.pendingBalance.formattedCoin()) \(params.unitLabel) pending",
-                         bundle: .module, comment: "incoming unconfirmed balance, not yet spendable; %@ are amount + unit")
-                        .textStyle(.xs)
-                        .foregroundStyle(Theme.Colors.warning)
+                    let change = app.pendingChange
+                    let incoming = Amount(sats: app.pendingBalance.sats - change.sats)
+                    if incoming.sats > 0 {
+                        Text("+\(incoming.formattedCoin()) \(params.unitLabel) pending",
+                             bundle: .module, comment: "incoming unconfirmed balance, not yet spendable; %@ are amount + unit")
+                            .textStyle(.xs)
+                            .foregroundStyle(Theme.Colors.warning)
+                    }
+                    if change.sats > 0 {
+                        Text("+\(change.formattedCoin()) \(params.unitLabel) change · usable after the next block",
+                             bundle: .module, comment: "own change from a send, spendable once the next block confirms it; %@ are amount + unit")
+                            .textStyle(.xs)
+                            .foregroundStyle(Theme.Colors.text2)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 syncStatus
             }

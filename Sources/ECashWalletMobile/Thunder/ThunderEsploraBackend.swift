@@ -92,14 +92,30 @@ struct ThunderEsploraBackend: ThunderBackend {
             (address, try await client.addressDeposits(address))
         }
 
+        // Transactions this wallet funded (an input spends one of our addresses): their unconfirmed
+        // outputs to us are our own change, not incoming payments.
+        let ours = Set(addresses)
+        var funded = Set<String>()
+        for tx in txPages.flatMap({ $0 }) where tx.vin.contains(where: { vin in
+            vin.prevout.map { ours.contains($0.scriptPubKeyAddress) } ?? false
+        }) {
+            funded.insert(tx.txid)
+        }
+
         var utxos: [ThunderPointedOutput] = []
         var pendingSats: UInt64 = 0
+        var pendingChangeSats: UInt64 = 0
         for (address, rows) in utxoPages {
             guard let parsed = ThunderAddress(base58: address) else { continue }
             for row in rows {
                 guard let output = row.pointedOutput(address: parsed) else { continue }
                 // Only confirmed coins are spendable (see ThunderScan.pendingSats).
-                if row.status.confirmed { utxos.append(output) } else { pendingSats &+= output.valueSats }
+                if row.status.confirmed {
+                    utxos.append(output)
+                } else {
+                    pendingSats &+= output.valueSats
+                    if funded.contains(row.txid) { pendingChangeSats &+= output.valueSats }
+                }
             }
         }
         let transactions = ThunderEsploraHistory.build(txs: txPages.flatMap { $0 },
@@ -107,7 +123,8 @@ struct ThunderEsploraBackend: ThunderBackend {
                                                        ours: Set(addresses),
                                                        tipHeight: tipHeight,
                                                        addressIndex: ThunderHistory.addressIndices(addresses))
-        return ThunderScan(utxos: utxos, transactions: transactions, pendingSats: pendingSats)
+        return ThunderScan(utxos: utxos, transactions: transactions, pendingSats: pendingSats,
+                           pendingChangeSats: pendingChangeSats)
     }
 
     func spendableUTXOs(addresses: [String]) async throws -> [ThunderPointedOutput] {

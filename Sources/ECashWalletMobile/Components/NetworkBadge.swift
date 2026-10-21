@@ -24,6 +24,8 @@ struct NetworkBadge: View {
     var body: some View {
         Text(verbatim: name)   // network display name (proper noun, from NetworkRegistry)
             .textStyle(.overline) // uppercased + tracked
+            .lineLimit(1)
+            .fixedSize()          // a chip never wraps onto two lines; its row makes room instead
             .foregroundStyle(style.foreground)
             .padding(.horizontal, Theme.Space.x3)
             .padding(.vertical, Theme.Space.x1)

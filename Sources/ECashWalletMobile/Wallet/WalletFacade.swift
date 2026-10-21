@@ -33,6 +33,7 @@ final class WalletFacade: WalletOps {
 
     func balance(walletId: String) throws -> Amount { try route(walletId).balance(walletId: walletId) }
     func pendingBalance(walletId: String) throws -> Amount { try route(walletId).pendingBalance(walletId: walletId) }
+    func pendingChange(walletId: String) -> Amount { route(walletId).pendingChange(walletId: walletId) }
     func sync(walletId: String) async throws -> Amount { try await route(walletId).sync(walletId: walletId) }
     func rescan(walletId: String) async throws -> Amount { try await route(walletId).rescan(walletId: walletId) }
     func balanceAsync(walletId: String) async throws -> Amount { try await route(walletId).balanceAsync(walletId: walletId) }

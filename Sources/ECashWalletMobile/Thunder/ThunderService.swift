@@ -52,6 +52,8 @@ final class ThunderService: WalletOps {
 
     /// Last synced value of the wallet's UNCONFIRMED outputs (see `ThunderScan.pendingSats`).
     private var pendingCache: [String: UInt64] = [:]
+    /// The part of `pendingCache` that is our own change (`ThunderScan.pendingChangeSats`).
+    private var pendingChangeCache: [String: UInt64] = [:]
 
     /// How far past the highest revealed index a sync still looks. Mirrors BIP44's gap limit: money
     /// paid to an address we handed out but never recorded still has to be found.
@@ -117,6 +119,11 @@ final class ThunderService: WalletOps {
         Amount(sats: Int64(clamping: pendingCache[walletId] ?? 0))
     }
 
+    /// Our own change within `pendingBalance` — returns to the spendable balance at the next block.
+    func pendingChange(walletId: String) -> Amount {
+        Amount(sats: Int64(clamping: pendingChangeCache[walletId] ?? 0))
+    }
+
     /// Scan this wallet's addresses (0 ..< revealed + gap limit), refresh the cached UTXO set, and
     /// rebuild history from the unspent + spent reads.
     /// Thunder derives its own address window on every sync (no BDK revealed-spk model), so a
@@ -136,6 +143,7 @@ final class ThunderService: WalletOps {
         utxoCache[walletId] = scan.utxos
         historyCache[walletId] = datedNewestFirst(scan.transactions, walletId: walletId)
         pendingCache[walletId] = scan.pendingSats
+        pendingChangeCache[walletId] = scan.pendingChangeSats
         return try balance(walletId: walletId)
     }
 
@@ -402,5 +410,6 @@ final class ThunderService: WalletOps {
         utxoCache[walletId] = nil
         historyCache[walletId] = nil
         pendingCache[walletId] = nil
+        pendingChangeCache[walletId] = nil
     }
 }

@@ -7,12 +7,11 @@ import WalletService
 
 /// What "Withdraw" opens on a sidechain wallet: the two ways to move coins back to the mainchain, each
 /// explained before the user picks — the slow, trustless regular withdrawal, and the fast withdrawal
-/// through a liquidity provider. Only the regular one exists today; fast is shown, honestly labelled,
-/// so users know it's coming and why they might want it.
+/// through a liquidity provider (`docs/fast-withdrawal.md`). Fast withdrawals still in progress are
+/// listed first so the user can get back to them.
 ///
-/// Fast withdrawal: BitWindow's runs through L2L's `fw1/fw2.drivechain.info` servers — the user pays
-/// on the sidechain first and the provider pays out on the mainchain (custodial for that window). Those
-/// servers don't serve betanet today, so there is nothing to connect it to yet.
+/// Fast withdrawal is switched on/off in `FastWithdrawalConfig.isEnabled`; when off (or the sidechain
+/// has no service) it shows as "Coming soon".
 struct WithdrawOptionsSheet: View {
     @Environment(AppState.self) var app
     @Environment(\.dismiss) var dismiss   // not `private` — Fuse bridges view properties
@@ -27,6 +26,16 @@ struct WithdrawOptionsSheet: View {
                         .textStyle(.sm)
                         .foregroundStyle(Theme.Colors.text1)
 
+                    ForEach(activeFast) { record in
+                        option(icon: Icon.pending,
+                               title: Text("Fast withdrawal in progress", bundle: .module,
+                                           comment: "withdraw options: an unfinished fast withdrawal"),
+                               body: Text(verbatim: "\(Amount(sats: record.l1PayoutSats).formattedCoin()) → \(record.l1Destination)"),
+                               badge: nil, enabled: true) {
+                            path.append(.fastTracking(record.id))
+                        }
+                    }
+
                     option(icon: Icon.pending,
                            title: Text("Regular withdrawal", bundle: .module, comment: "withdraw option title"),
                            body: Text("Miners approve it through the chain itself. No middleman and only network fees, but it takes months — about 3 at best.",
@@ -35,12 +44,19 @@ struct WithdrawOptionsSheet: View {
                         path.append(.regular)
                     }
 
+                    // ── Fast withdrawal option ───────────────────────────────────────────────────
+                    // On/off: FastWithdrawalConfig.isEnabled. To remove the option entirely, comment out
+                    // this one call.
                     option(icon: Icon.send,
                            title: Text("Fast withdrawal", bundle: .module, comment: "withdraw option title"),
                            body: Text("A liquidity provider pays you on \(mainchainName) right away and takes your coins in return, for a small fee. You rely on the provider.",
                                       bundle: .module, comment: "fast withdrawal explanation; %@ is the mainchain name"),
-                           badge: Text("Coming soon", bundle: .module, comment: "fast withdrawal unavailable badge"),
-                           enabled: false) {}
+                           badge: fastAvailable ? nil
+                               : Text("Coming soon", bundle: .module, comment: "fast withdrawal unavailable badge"),
+                           enabled: fastAvailable) {
+                        path.append(.fast)
+                    }
+                    // ─────────────────────────────────────────────────────────────────────────────
                 }
                 .padding(Theme.Space.gutter)
             }
@@ -57,9 +73,30 @@ struct WithdrawOptionsSheet: View {
                     if let vm = app.makeSidechainWithdrawViewModel() {
                         SidechainWithdrawScreen(viewModel: vm) { dismiss() }
                     }
+                case .fast:
+                    if let vm = app.makeFastWithdrawalViewModel() {
+                        FastWithdrawalScreen(viewModel: vm) { dismiss() }
+                    }
+                case .fastTracking(let id):
+                    if let record = activeFast.first(where: { $0.id == id }) ?? trackedRecord(id),
+                       let vm = app.makeFastWithdrawalViewModel(resuming: record) {
+                        FastWithdrawalScreen(viewModel: vm) { dismiss() }
+                    }
                 }
             }
         }
+    }
+
+    private var fastAvailable: Bool { app.fastWithdrawalEndpoint != nil }
+
+    /// Read when the sheet appears (and each time it re-renders); nothing to show when the feature is off.
+    private var activeFast: [FastWithdrawalRecord] {
+        fastAvailable ? app.activeFastWithdrawals() : []
+    }
+
+    private func trackedRecord(_ id: String) -> FastWithdrawalRecord? {
+        guard let walletId = app.selectedWalletId else { return nil }
+        return app.fastWithdrawalStore.record(id: id, walletId: walletId)
     }
 
     private var mainchainName: String {
@@ -112,4 +149,6 @@ struct WithdrawOptionsSheet: View {
 
 enum WithdrawRoute: Hashable {
     case regular
+    case fast
+    case fastTracking(String)   // withdrawal id
 }

@@ -206,20 +206,18 @@ struct SidechainWithdrawScreen: View {
             .opacity(vm.canReview ? 1 : 0.4)
     }
 
+    /// From → to, as the two network chips. No card and no kind label: the title already says which
+    /// withdrawal this is, and squeezing a label in beside the chips made the sidechain's wrap.
     private var header: some View {
-        HStack(spacing: Theme.Space.x3) {
+        HStack(spacing: Theme.Space.x2) {
             NetworkBadge(network: vm.sidechainNetwork)
             Image(icon: Icon.disclosure)
                 .resizable().scaledToFit()
-                .frame(width: 14, height: 14)
+                .frame(width: 12, height: 12)
                 .foregroundStyle(Theme.Colors.text2)
             NetworkBadge(network: vm.mainchain)
-            Spacer()
-            Text("Regular withdrawal", bundle: .module, comment: "withdrawal kind label in the header")
-                .textStyle(.xs)
-                .foregroundStyle(Theme.Colors.text1)
+            Spacer(minLength: 0)
         }
-        .card()
     }
 
     // MARK: - Review (Golden Rule §7: network, recipient, amount, fee — and the wait)

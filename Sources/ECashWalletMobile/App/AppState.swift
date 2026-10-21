@@ -30,6 +30,12 @@ final class AppState {
     private(set) var balance: Amount = .zero
     /// Not-yet-spendable balance (incoming 0-conf + immature). Shown separately so it doesn't look lost.
     private(set) var pendingBalance: Amount = .zero
+    /// The part of `pendingBalance` that is the selected wallet's own change waiting for a block
+    /// (Thunder only). Read alongside `pendingBalance`, which is what triggers the re-render.
+    var pendingChange: Amount {
+        guard let id = selectedWalletId else { return .zero }
+        return Amount(sats: min(walletOps.pendingChange(walletId: id).sats, pendingBalance.sats))
+    }
     /// Sync lifecycle for the selected wallet, so the UI can show a spinner / error.
     private(set) var syncState: SyncState = .idle
     /// The selected wallet's transactions, newest first (pending at the top). Cached, then refreshed.
@@ -964,6 +970,69 @@ final class AppState {
             })
     }
 
+    // MARK: - Fast withdrawal (docs/fast-withdrawal.md)
+
+    @ObservationIgnored let fastWithdrawalStore = FastWithdrawalStore()
+
+    /// The selected sidechain wallet's fast-withdrawal service, or nil when the feature is switched off
+    /// (`FastWithdrawalConfig.isEnabled`) or this sidechain has none.
+    var fastWithdrawalEndpoint: FastWithdrawalConfig.Endpoint? {
+        guard let network = selectedWallet?.network,
+              SidechainWalletNetwork.mainchain(ofSidechainWallet: network) != nil else { return nil }
+        return FastWithdrawalConfig.activeEndpoint(forSidechain: network)
+    }
+
+    /// Fast withdrawals of the selected wallet that are paid but not settled.
+    func activeFastWithdrawals() -> [FastWithdrawalRecord] {
+        guard let id = selectedWalletId else { return [] }
+        return fastWithdrawalStore.activeRecords(walletId: id)
+    }
+
+    /// A new fast withdrawal, or `resuming` one already in progress.
+    func makeFastWithdrawalViewModel(resuming: FastWithdrawalRecord? = nil) -> FastWithdrawalViewModel? {
+        guard let id = selectedWalletId, let wallet = selectedWallet,
+              let mainchain = SidechainWalletNetwork.mainchain(ofSidechainWallet: wallet.network),
+              let endpoint = fastWithdrawalEndpoint, let baseURL = endpoint.baseURL else { return nil }
+        let ops = walletOps
+        let manager = self.manager
+        let destinations = manager.wallets
+            .filter { $0.network == mainchain }
+            .map { SendViewModel.Destination(id: $0.id, label: $0.label, balance: balanceSummary(walletId: $0.id)) }
+        let deps = FastWithdrawalViewModel.Dependencies(
+            service: FastWithdrawalClient(baseURL: baseURL),
+            endpoint: endpoint,
+            isValidDestination: { address in
+                // BDK's parse: checksum AND the mainchain's network.
+                (try? manager.scriptPubKeyHex(for: address, network: mainchain)) != nil
+            },
+            pay: { address, amount in
+                // One output to the quote address (output 0 — the vout reported to the service).
+                try await ops.send(walletId: id, to: address, amount: amount,
+                                   feeRate: SendViewModel.FeeTier.normal.feeRate)
+            },
+            authorize: { reason in
+                guard self.appLock.enabled else { return true }
+                return await DeviceAuth.authenticate(reason: reason)
+            },
+            refundAddress: {
+                try await ops.receiveAddress(walletId: id, unused: false).address
+            },
+            addressForDestination: { walletId in
+                try await ops.receiveAddress(walletId: walletId, unused: true).address
+            },
+            onPaid: { tx in
+                self.insertPending(tx)
+                Task { await self.sync() }
+            },
+            store: fastWithdrawalStore)
+        let sidechainParams = NetworkRegistry.params(for: wallet.network)
+        return FastWithdrawalViewModel(
+            walletId: id, sidechainTitle: sidechainParams.displayName, sidechainNetwork: wallet.network,
+            mainchain: mainchain, mainchainDisplayName: NetworkRegistry.params(for: mainchain).displayName,
+            unitLabel: sidechainParams.unitLabel, spendable: balance, destinations: destinations,
+            resuming: resuming, dependencies: deps)
+    }
+
     /// Where a withdrawal from the selected sidechain wallet stands (waiting for a batch / miners voting /
     /// paid), or nil when it can't be told: not a sidechain wallet, no enforcer for its mainchain, the
     /// wallet is on the node-RPC backend (only the Esplora index can say what spent an output), or a
@@ -1115,6 +1184,7 @@ final class AppState {
         // so a later wallet can't inherit a stale "already synced" claim.
         syncStore.forget(walletId: id)
         splitCheckStore.forget(walletId: id)
+        fastWithdrawalStore.forget(walletId: id)
         walletOps.forget(walletId: id)   // Thunder's revealed index, first-seen times, account xpub
         if wasSelected { resetPerWalletState() }
         refresh()

@@ -132,7 +132,8 @@ import WalletService
     }
 
     private static func txJSON(txid: String, toAddress: String, value: Int, height: Int = 90,
-                               confirmed: Bool = true) -> String {
+                               confirmed: Bool = true,
+                               fromAddress: String = "3SomeoneElseXXXXXXXXXXXXXXXXX") -> String {
         let status = confirmed
             ? #"{"confirmed":true,"block_height":\#(height),"block_hash":"\#(String(repeating: "ab", count: 32))","block_time":1750000000}"#
             : #"{"confirmed":false,"block_height":null,"block_hash":null,"block_time":null}"#
@@ -141,7 +142,7 @@ import WalletService
           "vin":[{"txid":"\(String(repeating: "99", count: 32))","vout":0,
                   "prevout":{"scriptpubkey":"","scriptpubkey_asm":"",
                              "scriptpubkey_type":"sidechain_address",
-                             "scriptpubkey_address":"3SomeoneElseXXXXXXXXXXXXXXXXX","value":\(value + 500),
+                             "scriptpubkey_address":"\(fromAddress)","value":\(value + 500),
                              "outpoint_kind":"regular","content_type":"value"},
                   "scriptsig":"","witness":[],"is_coinbase":false,"sequence":0}],
           "vout":[{"scriptpubkey":"","scriptpubkey_asm":"",
@@ -382,6 +383,31 @@ import WalletService
         let service = index.service()
         _ = try await service.sync(walletId: "w1")
         #expect(try service.pendingBalance(walletId: "w1") == Amount(sats: 29_730))
+    }
+
+    /// A send's change is pending like an incoming payment (neither is spendable until the next block),
+    /// but it's reported apart, so the UI can say "change" instead of making the balance look gone.
+    @Test func ownChangeIsToldApartFromIncoming() async throws {
+        let index = Index()
+        index.usedAddresses = [Self.address0]
+        let changeTxid = String(repeating: "aa", count: 32)
+        let incomingTxid = String(repeating: "bb", count: 32)
+        index.utxosByAddress[Self.address0] = Self.page([
+            Self.utxoJSON(value: 80_000, vout: 1, txid: changeTxid, confirmed: false),
+            Self.utxoJSON(value: 3_000, vout: 0, txid: incomingTxid, confirmed: false),
+        ])
+        index.txPagesByAddress[Self.address0] = [Self.page([
+            // We funded this one: its input spends our own address.
+            Self.txJSON(txid: changeTxid, toAddress: Self.address0, value: 80_000, confirmed: false,
+                        fromAddress: Self.address0),
+            // Someone else paid us.
+            Self.txJSON(txid: incomingTxid, toAddress: Self.address0, value: 3_000, confirmed: false),
+        ])]
+
+        let service = index.service()
+        _ = try await service.sync(walletId: "w1")
+        #expect(try service.pendingBalance(walletId: "w1") == Amount(sats: 83_000))
+        #expect(service.pendingChange(walletId: "w1") == Amount(sats: 80_000))
     }
 
     /// The node can't spend an output that isn't in a block yet (its utreexo accumulator only holds
