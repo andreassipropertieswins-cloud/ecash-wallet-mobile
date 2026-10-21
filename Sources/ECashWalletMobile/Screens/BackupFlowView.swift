@@ -14,6 +14,7 @@ struct BackupFlowView: View {
     @State var vm: BackupViewModel   // not `private` — Fuse bridges @State (skip-fuse rule)
     @State var understood = false     // the "I understand…" acknowledgement gate on the intro
     @State var scamsExpanded = false  // the "Common scams" disclosure (folded by default)
+    @State var copied = false         // private-key copy confirmation (sensitive, auto-clearing)
 
     init(viewModel: BackupViewModel) {
         _vm = State(initialValue: viewModel)
@@ -203,10 +204,25 @@ struct BackupFlowView: View {
                 .padding(Theme.Space.x3)
                 .background(Theme.Colors.bg2, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
 
-            Button { Clipboard.copy(vm.privateKey) } label: {
-                Text("Copy private key", bundle: .module, comment: "backup: copy private key button")
-                    .textStyle(.body)
-                    .foregroundStyle(Theme.Colors.accent)
+            // The key controls the coins, so it goes out sensitive: local-only, cleared after a minute.
+            Button {
+                Clipboard.copySensitive(vm.privateKey)
+                copied = true
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    copied = false
+                }
+            } label: {
+                if copied {
+                    Text("Copied — clears in a minute", bundle: .module,
+                         comment: "sensitive copy confirmation: clipboard is cleared after a minute")
+                        .textStyle(.body)
+                        .foregroundStyle(Theme.Colors.text1)
+                } else {
+                    Text("Copy private key", bundle: .module, comment: "backup: copy private key button")
+                        .textStyle(.body)
+                        .foregroundStyle(Theme.Colors.accent)
+                }
             }
             .buttonStyle(.plain)
 

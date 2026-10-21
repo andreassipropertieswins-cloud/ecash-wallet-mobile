@@ -25,6 +25,7 @@ struct EntropySeedPreviewScreen: View {
 
     @State var words: [String] = []
     @State var error: String? = nil
+    @State var copied = false   // not `private` — Fuse bridges @State to Compose (skip-fuse rule)
 
     var body: some View {
         ZStack {
@@ -65,9 +66,23 @@ struct EntropySeedPreviewScreen: View {
                             .foregroundStyle(Theme.Colors.text2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         // The input to check, copyable right here next to the recipe that checks it.
-                        Button { Clipboard.copy(field) } label: {
-                            Text("Copy input", bundle: .module, comment: "copy the entropy field for auditing")
-                                .textStyle(.xs)
+                        // Seed-equivalent, so sensitive: local-only, cleared after a minute.
+                        Button {
+                            Clipboard.copySensitive(field)
+                            copied = true
+                            Task {
+                                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                                copied = false
+                            }
+                        } label: {
+                            if copied {
+                                Text("Copied — clears in a minute", bundle: .module,
+                                     comment: "sensitive copy confirmation: clipboard is cleared after a minute")
+                                    .textStyle(.xs)
+                            } else {
+                                Text("Copy input", bundle: .module, comment: "copy the entropy field for auditing")
+                                    .textStyle(.xs)
+                            }
                         }
                         .tint(Theme.Colors.accent)
                         .padding(.top, Theme.Space.x1)

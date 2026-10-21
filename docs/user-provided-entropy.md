@@ -341,6 +341,14 @@ hand-transcribing the string to audit it is impractical. The audit path is copy-
 confirm step should show the derived entropy hex so the check is over 64 hex characters rather than
 500 base32 ones.
 
+That copy is **seed-equivalent**, so it does not get ordinary clipboard semantics (issue #21). It goes
+through `Clipboard.copySensitive` / `ClipboardPolicy`: on iOS `localOnly` (never Universal Clipboard,
+so never iCloud) plus an OS-enforced 60-second expiry; on Android a blank label, the Android 13+
+`EXTRA_IS_SENSITIVE` flag (kept out of the clipboard overlay and keyboard suggestions) and an
+app-scheduled clear after the same 60 seconds, skipped only if the user has copied something else in
+the meantime. One consequence: the paste-into-a-terminal audit has to happen on **this** device
+(e.g. a-Shell / Termux), not via Handoff to a Mac — a seed must not transit iCloud to save a step.
+
 ### 6.2b Typed / pasted entropy — inferred, not declared
 
 **In scope for v1.** A user who rolled dice or flipped coins off-device types the result instead of

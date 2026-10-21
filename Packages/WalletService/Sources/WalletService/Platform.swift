@@ -26,6 +26,36 @@ public enum PlatformBridge {
         #endif
     }
 
+    /// Copy seed-equivalent text (user entropy, a WIF private key). Differs from `copyToClipboard`
+    /// per `ClipboardPolicy`: no descriptive label, flagged sensitive so Android 13+ keeps it out of
+    /// the clipboard overlay and keyboard suggestions, and cleared after the policy lifetime —
+    /// unless the user has copied something else since, which is left alone.
+    /// No-op off Android — iOS sets `UIPasteboard` expiry/local-only directly.
+    public static func copySensitiveToClipboard(_ text: String) {
+        #if SKIP
+        let context = ProcessInfo.processInfo.androidContext
+        guard let clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager else {
+            return
+        }
+        let clip = android.content.ClipData.newPlainText(ClipboardPolicy.sensitiveLabel, text)
+        // `ClipDescription.EXTRA_IS_SENSITIVE` (API 33) spelled out: the key is simply ignored on
+        // 28–32, so it needs no SDK gate, and the literal avoids an inlined-API lint complaint.
+        let extras = android.os.PersistableBundle()
+        extras.putBoolean("android.content.extra.IS_SENSITIVE", true)
+        clip.description.extras = extras
+        clipboard.setPrimaryClip(clip)
+
+        // No expiry API on Android: schedule the clear ourselves (`clearPrimaryClip` is API 28).
+        let delayMillis = ClipboardPolicy.sensitiveLifetimeSeconds * Int64(1000)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            let current = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
+            if ClipboardPolicy.shouldClear(current: current, copied: text) {
+                clipboard.clearPrimaryClip()
+            }
+        }, delayMillis)
+        #endif
+    }
+
     /// Read plain text from the Android system clipboard, or nil when it's empty or holds
     /// something that isn't text. No-op off Android — iOS reads `UIPasteboard` directly.
     ///

@@ -25,6 +25,7 @@ struct EntropyInputScreen: View {
     @State var layout: [Character] = EntropyAlphabet.shuffled()
     @State var isEditing = false
     @State var editText = ""
+    @State var copied = false   // not `private` — Fuse bridges @State to Compose (skip-fuse rule)
 
     /// `model` comes from the session New wallet's Continue created, which already drew this session's
     /// device randomness and timestamp.
@@ -144,9 +145,23 @@ struct EntropyInputScreen: View {
                         .textStyle(.xs)
                 }
                 .tint(Theme.Colors.accent)
-                Button { Clipboard.copy(vm.field) } label: {
-                    Text("Copy", bundle: .module, comment: "copy the entropy field for auditing")
-                        .textStyle(.xs)
+                // The field IS the seed, so it goes out sensitive: local-only, cleared after a minute.
+                Button {
+                    Clipboard.copySensitive(vm.field)
+                    copied = true
+                    Task {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        copied = false
+                    }
+                } label: {
+                    if copied {
+                        Text("Copied — clears in a minute", bundle: .module,
+                             comment: "sensitive copy confirmation: clipboard is cleared after a minute")
+                            .textStyle(.xs)
+                    } else {
+                        Text("Copy", bundle: .module, comment: "copy the entropy field for auditing")
+                            .textStyle(.xs)
+                    }
                 }
                 .tint(Theme.Colors.accent)
                 .padding(.leading, Theme.Space.x3)
