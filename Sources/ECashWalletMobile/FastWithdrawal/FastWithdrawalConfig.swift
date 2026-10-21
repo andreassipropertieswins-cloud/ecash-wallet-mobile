@@ -12,7 +12,10 @@ enum FastWithdrawalConfig {
     /// **The switch.** `false` hides the "Fast withdrawal" option everywhere (it shows as "Coming
     /// soon" in the Withdraw sheet) and stops any background polling. Withdrawals already in flight
     /// are kept on disk and reappear when it's turned back on.
-    static let isEnabled = true
+    ///
+    /// OFF for now (2026-10-21): the flow is built and tested against fakes but hasn't been exercised
+    /// against the live betanet service yet. Flip to `true` to ship it.
+    static let isEnabled = false
 
     /// The service for withdrawals FROM `sidechain`, or nil when there isn't one (the option is then
     /// hidden). Exhaustive on purpose: a new network won't compile until someone decides.
