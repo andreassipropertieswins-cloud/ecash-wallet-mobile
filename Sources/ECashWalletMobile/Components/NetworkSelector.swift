@@ -31,10 +31,17 @@ struct NetworkSelector: View {
             // risk here, where the choice is made.
             NetworkBadge(network: network)
             if network.isMainnet {
-                Text("Real bitcoin. Transactions are irreversible — only create this to hold real funds.",
-                     bundle: .module, comment: "mainnet wallet creation warning")
-                    .textStyle(.xs)
-                    .foregroundStyle(Theme.Colors.warning)
+                Group {
+                    if network == .bitcoin {
+                        Text("Real bitcoin. Transactions are irreversible — only create this to hold real funds.",
+                             bundle: .module, comment: "mainnet wallet creation warning")
+                    } else {
+                        Text("Real eCash. Transactions are irreversible — only create this to hold real funds.",
+                             bundle: .module, comment: "eCash mainnet wallet creation warning")
+                    }
+                }
+                .textStyle(.xs)
+                .foregroundStyle(Theme.Colors.warning)
             }
         }
     }

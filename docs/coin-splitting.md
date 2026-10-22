@@ -24,11 +24,16 @@ Drain the wallet's spendable balance to a **fresh address of the same wallet**, 
 Bitcoin will not accept:
 
 ```swift
-nLockTime = 499_999_999          // LOCKTIME_THRESHOLD - 1
+nLockTime = 499_999_999          // LOCKTIME_THRESHOLD - 1 on the test forks (alphanet, betanet)
+nLockTime = 499_999_998          // LOCKTIME_THRESHOLD - 2 on the REAL eCash mainnet (`.ecashMainnet`)
 nSequence = 0xFFFF_FFFD          // non-final on every input
 ```
 
-eCash's patched consensus treats that locktime as *final*; stock Bitcoin Core reads it as a height
+The two values are not interchangeable: each chain's node treats only its own marker as final, and
+the other reads as an ordinary block height ~500M blocks out (rejected as non-final). The value is
+compiled per network in `NetworkRegistry.replayProtectionLockHeight`, never read from config.
+
+eCash's patched consensus treats its locktime as *final*; stock Bitcoin Core reads it as a height
 ~500,000,000 (~9,500 years out) and rejects the transaction as non-final. Both halves are required —
 Bitcoin only *enforces* locktime when at least one input is non-final, so with all-final inputs the
 marker is ignored and the transaction replays anyway.

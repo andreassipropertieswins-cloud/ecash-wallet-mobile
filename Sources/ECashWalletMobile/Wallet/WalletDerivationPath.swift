@@ -15,7 +15,7 @@ enum WalletDerivationPath {
         switch wallet.network {
         case .thunder:
             return ThunderKey.scheme.derivationPath(index: index)
-        case .bitcoin, .signet, .ecash, .ecashBeta:
+        case .bitcoin, .signet, .ecash, .ecashBeta, .ecashMainnet:
             return wallet.derivationPath(isChange: isChange, index: index)
         }
     }

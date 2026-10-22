@@ -133,6 +133,21 @@ public enum WalletNetwork: String, Equatable, Hashable, Sendable, CaseIterable {
     /// comes from the remote config's `display_name`** ("Alphanet" / "Betanet"), which is also how
     /// the real eCash mainnet will eventually be labelled without a migration.
     case ecashBeta
+    /// The **real eCash mainnet** — the fork of Bitcoin at block 973,728 that holds real ECX
+    /// (github.com/ecash-com/bitcoin, `consensus.EcashHeight`). Same derivation shape as the test
+    /// forks: byte-identical to Bitcoin, mainnet `bc` HRP, coin-type `0'`, BDK `Network.bitcoin`, unit
+    /// **ECX** — so one seed derives the SAME addresses here as on alphanet, betanet and Bitcoin. What
+    /// differs is consensus-level and compiled: its replay-protection marker is `499_999_998` (the test
+    /// forks use `499_999_999`), its fork height, and OP_DRIVECHAIN = NOP8.
+    ///
+    /// **Real money.** `isMainnet` is true, so it gets Bitcoin's extra send confirmation and warnings.
+    ///
+    /// **Gated on the remote config, not a release** (`EcashMainnetLaunch`): the case is compiled in
+    /// ahead of the fork, but it is NOT offered in any picker until drivechain.dev/config publishes the
+    /// `ecash-mainnet` entry, and it does NOT become the default eCash network until the chain is
+    /// observed past the entry's `fork_height`. Betanet keeps running alongside it either way — its
+    /// case is never repurposed (a wallet's network is persisted by rawValue).
+    case ecashMainnet
     /// The **Thunder** sidechain of eCash (LayerTwo-Labs/thunder-rust). NOT a BDK/secp256k1 chain —
     /// ed25519 keys, BLAKE3 base58 addresses, a Thunder-node RPC backend. Routed to the Fuse-native
     /// `ThunderService` (never the BDK engine); the `coinType`/`addressHRP` in its registry entry are
@@ -143,29 +158,43 @@ public enum WalletNetwork: String, Equatable, Hashable, Sendable, CaseIterable {
     /// (which the backend/registry loops still walk for every case). **To hide Thunder as a creatable
     /// option** (e.g. until its RPC ships), comment out the `.thunder` line below: the case still
     /// exists so existing Thunder wallets keep resolving; users just can't create new ones.
-    public static let selectable: [WalletNetwork] = [
-        .bitcoin,
-        .signet,
-        .ecash,
-        .ecashBeta,
+    ///
+    /// **eCash mainnet is listed only once the remote config publishes it** (`EcashMainnetLaunch.isOffered`),
+    /// so the picker can't offer a network the app has no live endpoint for.
+    public static var selectable: [WalletNetwork] {
+        var out: [WalletNetwork] = [
+            .bitcoin,
+            .signet,
+            .ecash,
+            .ecashBeta,
+        ]
+        if EcashMainnetLaunch.isOffered {
+            out.append(.ecashMainnet)
+        }
         // Thunder: re-enabled 2026-09-29. It was hidden while the drivechain-esplora index held no
         // blocks (2026-09-01), which would have shown a zero balance for real ECX. The betanet index
         // is now walking (tip 859, advancing), and the app can deposit to Thunder. To hide it again,
         // comment this line out: existing Thunder wallets keep resolving either way.
-        .thunder,
-    ]
+        out.append(.thunder)
+        return out
+    }
 
     /// **The eCash chain the app currently points at** for new wallets, imports, and investor
-    /// claims. One constant so "which eCash is live" is a single edit, not a hunt through defaults.
+    /// claims. One place so "which eCash is live" is a single rule, not a hunt through defaults.
     ///
-    /// `.ecashBeta` (betanet) as of 2026-09-21 — alphanet still runs but is no longer where the work
-    /// is. Existing alphanet wallets are unaffected: a wallet's network is fixed at creation and
-    /// persisted, so this only steers NEW ones.
+    /// `.ecashBeta` (betanet) until the real fork, then `.ecashMainnet` — the switch is driven by the
+    /// chain, not a release (`EcashMainnetLaunch.isDefault`): mainnet takes over only once the remote
+    /// config lists it AND the chain has been observed past its `fork_height`. Before the fork the
+    /// "mainnet" chain is still Bitcoin, so defaulting there early would create wallets on a chain
+    /// that doesn't exist yet. Existing wallets are unaffected either way: a wallet's network is fixed
+    /// at creation and persisted, so this only steers NEW ones.
     ///
     /// Safe to move for claims specifically, because an investor key holds the same pre-fork Bitcoin
-    /// UTXOs on **every** eCash fork — both chains inherit the pre-fork set, so a claim works on
-    /// whichever one this points at. Point it at the real eCash mainnet when that ships.
-    public static let currentEcash: WalletNetwork = .ecashBeta
+    /// UTXOs on **every** eCash fork — all of them inherit the pre-fork set, so a claim works on
+    /// whichever one this points at.
+    public static var currentEcash: WalletNetwork {
+        EcashMainnetLaunch.isDefault ? .ecashMainnet : .ecashBeta
+    }
 
     /// Whether coin-splitting applies to this network — i.e. it is a Bitcoin fork whose pre-fork
     /// UTXOs are shared with Bitcoin and therefore need separating (`SplitSummary.classify`,
@@ -178,7 +207,7 @@ public enum WalletNetwork: String, Equatable, Hashable, Sendable, CaseIterable {
     /// until someone decides this — the same protection every other per-network capability has.
     public var supportsCoinSplit: Bool {
         switch self {
-        case .ecash, .ecashBeta: return true
+        case .ecash, .ecashBeta, .ecashMainnet: return true
         case .bitcoin, .signet, .thunder: return false
         }
     }
@@ -198,19 +227,22 @@ public enum WalletNetwork: String, Equatable, Hashable, Sendable, CaseIterable {
     /// someone decides whether a copied wallet there would really be the same wallet.
     var keyFamily: Int? {
         switch self {
-        case .bitcoin, .ecash, .ecashBeta: return 0   // coin-type 0', `bc` addresses
+        case .bitcoin, .ecash, .ecashBeta, .ecashMainnet: return 0   // coin-type 0', `bc` addresses
         case .signet: return nil                      // coin-type 1' — only itself
         case .thunder: return nil                     // ed25519, not BDK
         }
     }
 
-    /// True for everything that is NOT Bitcoin mainnet. Drives the persistent network
-    /// badge (Golden Rule §6) — non-mainnet wallets must be unmistakable. `.ecash`/`.ecashBeta` are
-    /// **test** chains that nonetheless use mainnet-style `bc` addresses, so they stay
-    /// non-mainnet here (violet chip, no real-money warnings) even though its addresses look
-    /// identical to real Bitcoin — the chip is the only thing distinguishing them.
+    /// **Real money.** True for Bitcoin mainnet and the real eCash mainnet; drives the extra send
+    /// confirmation and the real-money warnings (Golden Rule §6). `.ecash`/`.ecashBeta` are **test**
+    /// chains that nonetheless use mainnet-style `bc` addresses, so they stay false here (own chip,
+    /// no real-money warnings) even though their addresses look identical to real Bitcoin — the chip
+    /// is the only thing distinguishing them. Exhaustive so the next chain decides this explicitly.
     public var isMainnet: Bool {
-        self == .bitcoin
+        switch self {
+        case .bitcoin, .ecashMainnet: return true
+        case .signet, .ecash, .ecashBeta, .thunder: return false
+        }
     }
 }
 

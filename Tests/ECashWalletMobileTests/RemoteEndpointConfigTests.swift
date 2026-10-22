@@ -512,7 +512,9 @@ import WalletService
         return try #require(RemoteEndpointConfig.parse(Data(json.utf8)))
     }
 
-    @Test(arguments: ["ecash", "ecx", "mainnet", "ecash-mainnet", "ecashMain"])
+    /// `ecash-mainnet` is no longer unknown (it is the real fork's id, see `EcashMainnetConfigTests`);
+    /// every other spelling still maps to nothing.
+    @Test(arguments: ["ecash", "ecx", "mainnet", "ecashMain", "ecashMainnet", "ecash_mainnet"])
     func realForkUnderAnUnknownIdLeavesAlphanetAndBetanetAlone(id: String) throws {
         let config = try configWithRealForkFirst(id: id)
 
@@ -548,7 +550,7 @@ import WalletService
 
     @Test func knownIdsStillMap() throws {
         let entries = [("bitcoin", WalletNetwork.bitcoin), ("signet", .signet), ("alphanet", .ecash),
-                       ("betanet", .ecashBeta), ("drynet3", .ecash)]
+                       ("betanet", .ecashBeta), ("drynet3", .ecash), ("ecash-mainnet", .ecashMainnet)]
         for (id, network) in entries {
             let json = """
             {"schema_version":1,"networks":[{"id":"\(id)","backends":[{"kind":"esplora","url":"https://x.example"}]}]}

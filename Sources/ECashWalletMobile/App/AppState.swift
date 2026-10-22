@@ -230,6 +230,15 @@ final class AppState {
     /// additive over the bundled defaults, and fail-safe (see `RemoteEndpointConfigService`). The
     /// off-actor fetch returns a plain value; the apply runs here on the main actor.
     func refreshRemoteEndpoints(force: Bool = false) async {
+        await applyRemoteEndpointsIfDue(force: force)
+        // Then, if the config has turned eCash mainnet on but the fork hasn't been seen yet, ask the
+        // chain. Outside the throttle on purpose: the config may not change for days around the
+        // fork, but the block arrives at one moment and the default should follow it on the next
+        // launch or resume, not the next config refresh.
+        await ForkWatch.checkIfNeeded()
+    }
+
+    private func applyRemoteEndpointsIfDue(force: Bool) async {
         // Throttle: skip if a fetch isn't due yet (honors the payload's refresh_after_seconds). The
         // app calls this on launch AND every foreground resume, so this keeps frequent resumes cheap.
         guard force || RemoteConfigRefreshPolicy.isDue() else { return }

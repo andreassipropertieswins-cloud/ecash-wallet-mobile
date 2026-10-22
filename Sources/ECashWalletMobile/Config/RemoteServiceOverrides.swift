@@ -92,6 +92,11 @@ enum RemoteServiceOverrides {
         UserDefaults.standard.set(cleaned, forKey: esploraKey(network))
     }
 
+    /// Test seam: forget a network's remote Esplora URL.
+    static func clearEsploraURLForTesting(for network: WalletNetwork) {
+        UserDefaults.standard.removeObject(forKey: esploraKey(network))
+    }
+
     /// Remotely-configured BIP300 enforcer URL for a network, or nil if none stored
     /// (`EnforcerEndpointRegistry`).
     static func enforcerURL(for network: WalletNetwork) -> URL? {

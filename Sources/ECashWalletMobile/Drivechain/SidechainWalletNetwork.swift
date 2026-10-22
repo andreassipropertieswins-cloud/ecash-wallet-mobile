@@ -21,7 +21,7 @@ enum SidechainWalletNetwork {
     static func mainchain(ofSidechainWallet network: WalletNetwork) -> WalletNetwork? {
         switch network {
         case .thunder: return .ecashBeta
-        case .bitcoin, .signet, .ecash, .ecashBeta: return nil
+        case .bitcoin, .signet, .ecash, .ecashBeta, .ecashMainnet: return nil
         }
     }
 
@@ -29,7 +29,7 @@ enum SidechainWalletNetwork {
     static func slot(ofSidechainWallet network: WalletNetwork) -> Int? {
         switch network {
         case .thunder: return RistrettoSidechainKeyScheme.thunder.sidechainNumber
-        case .bitcoin, .signet, .ecash, .ecashBeta: return nil
+        case .bitcoin, .signet, .ecash, .ecashBeta, .ecashMainnet: return nil
         }
     }
 
@@ -37,6 +37,10 @@ enum SidechainWalletNetwork {
         switch mainchain {
         case .ecashBeta:
             return slot == RistrettoSidechainKeyScheme.thunder.sidechainNumber ? .thunder : nil
+        case .ecashMainnet:
+            // Real fork: `.thunder` is wired to BETANET's index, so it must not be offered as the
+            // Thunder of a mainnet deposit. Thunder-on-mainnet needs its own case + index URL.
+            return nil
         case .ecash, .signet, .bitcoin, .thunder:
             // Alphanet and signet have no Thunder wallet type in this app; Bitcoin has no BIP300;
             // Thunder is itself a sidechain.

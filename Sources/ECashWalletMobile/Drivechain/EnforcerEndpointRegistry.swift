@@ -22,6 +22,12 @@ enum EnforcerEndpointRegistry {
         case .ecashBeta:
             // Hosted by L2L, the same one BitWindow's light mode uses. Verified 2026-09-29.
             return URL(string: "https://seed.beta.ecash.eu.com/enforcer")
+        case .ecashMainnet:
+            // Real fork: BitWindow's bundled default for real ECX (`seed.ecash.eu.com/enforcer`), NOT
+            // reachable as of 2026-10-22. The config's `services.enforcer.url` (overlay above) is the
+            // real source; this is the offline fallback. Sidechain deposits on real money stay
+            // behind the on-chain proof (`docs/real-ecash-fork-transition.md` §2).
+            return URL(string: "https://seed.ecash.eu.com/enforcer")
         case .ecash:
             // Alphanet. `seed.alpha.ecash.eu.com/enforcer` answers, but with BETANET's chain (same
             // tip hash, betanet's activation height 967,680). Using it would show betanet's

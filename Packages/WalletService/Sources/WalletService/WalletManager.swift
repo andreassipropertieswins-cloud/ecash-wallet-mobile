@@ -311,8 +311,31 @@ public final class WalletManager: @unchecked Sendable {
     // ABOVE the bundled default without ever masquerading as a user override in Settings. Persisted
     // so a cold, offline launch still uses the last-known-good remote endpoint (falls back to the
     // bundled default only if the config has never been fetched). See RemoteEndpointConfig.
-    private func remoteKindKey(_ n: WalletNetwork) -> String { "backend.remote.\(n.rawValue).kind" }
-    private func remoteUrlKey(_ n: WalletNetwork) -> String { "backend.remote.\(n.rawValue).url" }
+    private static func remoteKindKey(_ n: WalletNetwork) -> String { "backend.remote.\(n.rawValue).kind" }
+    private static func remoteUrlKey(_ n: WalletNetwork) -> String { "backend.remote.\(n.rawValue).url" }
+    private func remoteKindKey(_ n: WalletNetwork) -> String { WalletManager.remoteKindKey(n) }
+    private func remoteUrlKey(_ n: WalletNetwork) -> String { WalletManager.remoteUrlKey(n) }
+
+    /// Whether the fetched config has ever delivered a backend for `network` (last-known-good, so it
+    /// survives an offline launch). `EcashMainnetLaunch` reads this to decide whether eCash mainnet
+    /// is offered at all.
+    static func hasRemoteBackendDefault(for network: WalletNetwork) -> Bool {
+        let s = UserDefaults.standard.string(forKey: remoteUrlKey(network))?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return !(s ?? "").isEmpty
+    }
+
+    /// Test seam: store (or, with nil, remove) a remote backend without a manager instance.
+    static func setRemoteBackendDefaultForTesting(_ url: String?, kind: String, network: WalletNetwork) {
+        let defaults = UserDefaults.standard
+        if let url, !url.isEmpty {
+            defaults.set(kind, forKey: remoteKindKey(network))
+            defaults.set(url, forKey: remoteUrlKey(network))
+        } else {
+            defaults.removeObject(forKey: remoteKindKey(network))
+            defaults.removeObject(forKey: remoteUrlKey(network))
+        }
+    }
 
     private func trimmedOrNil(_ s: String?) -> String? {
         guard let s = s?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }

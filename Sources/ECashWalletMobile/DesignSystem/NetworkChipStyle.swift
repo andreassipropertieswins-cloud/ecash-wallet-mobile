@@ -23,14 +23,22 @@ struct NetworkChipStyle {
         case .signet:
             return NetworkChipStyle(background: Theme.Colors.netTestnet,
                                     foreground: Theme.Colors.netTestnetText)
-        case .ecash:
-            // eCash (drynet2) wears the eCash BRAND orange (`netEcash` = the amber accent) — this is
-            // the flagship network of the eCash wallet. NOTE: its `bc1…` addresses are byte-identical
-            // to real Bitcoin mainnet, so this amber MUST stay visually distinct from Bitcoin's
-            // `netMainnet` orange (#F7931A vs #E8A84A) — the chip is the primary safety cue (Golden
-            // Rule §6). Dark `accentText` for legible contrast on the amber.
+        case .ecashMainnet:
+            // The REAL eCash — wears the eCash BRAND amber (`netEcash` = the accent): this is the
+            // flagship network of the eCash wallet, and the one that holds real money. Its `bc1…`
+            // addresses are byte-identical to real Bitcoin's, so the amber MUST stay visually distinct
+            // from Bitcoin's `netMainnet` orange (#F7931A vs #E8A84A) — the chip is the primary
+            // safety cue (Golden Rule §6). Dark `accentText` for legible contrast on the amber.
             return NetworkChipStyle(background: Theme.Colors.netEcash,
                                     foreground: Theme.Colors.accentText)
+        case .ecash:
+            // Alphanet — the first test fork, being retired (the live config no longer lists it as
+            // of 2026-10-22). It wore the brand amber until the real fork took it (above): the chip
+            // is the only thing telling two eCash chains apart, and the amber now has to mean "real
+            // ECX". Slate grey: reads as "old test chain", far from amber, Bitcoin orange, betanet
+            // teal, testnet violet and Thunder crimson.
+            return NetworkChipStyle(background: Theme.Colors.netEcashLegacy,
+                                    foreground: Theme.Colors.netEcashLegacyText)
         case .ecashBeta:
             // eCash **betanet** — teal, NOT the eCash amber. Betanet and alphanet derive IDENTICAL
             // `bc1…` addresses from the same seed (both coin-type `0'`, both Bitcoin-identical), so

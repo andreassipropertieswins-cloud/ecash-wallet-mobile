@@ -363,11 +363,18 @@ struct SendScreen: View {
 
             // Real-money sends carry an extra, visible warning on top of the auth gate.
             if vm.isMainnet {
-                Text("Real bitcoin — this transaction is irreversible.",
-                     bundle: .module, comment: "mainnet send warning")
-                    .textStyle(.sm)
-                    .foregroundStyle(Theme.Colors.warning)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Group {
+                    if vm.network == .bitcoin {
+                        Text("Real bitcoin — this transaction is irreversible.",
+                             bundle: .module, comment: "mainnet send warning")
+                    } else {
+                        Text("Real eCash — this transaction is irreversible.",
+                             bundle: .module, comment: "eCash mainnet send warning")
+                    }
+                }
+                .textStyle(.sm)
+                .foregroundStyle(Theme.Colors.warning)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Spacer()
@@ -383,7 +390,9 @@ struct SendScreen: View {
             }
         }
         .padding(Theme.Space.gutter)
-        .alert(Text("Send real bitcoin?", bundle: .module, comment: "mainnet send confirmation title"),
+        .alert(vm.network == .bitcoin
+                ? Text("Send real bitcoin?", bundle: .module, comment: "mainnet send confirmation title")
+                : Text("Send real eCash?", bundle: .module, comment: "eCash mainnet send confirmation title"),
                isPresented: $showMainnetConfirm) {
             Button(role: .cancel) { } label: {
                 Text("Cancel", bundle: .module, comment: "cancel mainnet send")

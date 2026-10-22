@@ -46,6 +46,8 @@ enum FaucetRegistry {
             // Betanet: config publishes `faucet: {url: null}` today. The remote overlay above wins
             // when one appears, so the "Get coins" button turns on with no app update.
             return nil
+        case .ecashMainnet:
+            return nil   // real money: no faucet, ever (the overlay is still honoured if L2L ran one)
         case .thunder:
             return nil   // no Thunder faucet
         }

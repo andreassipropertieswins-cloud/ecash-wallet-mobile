@@ -91,6 +91,10 @@ struct RemoteEndpointConfig: Equatable, Sendable {
             case "signet": return .signet
             case "alphanet": return .ecash
             case "betanet": return .ecashBeta
+            // The real fork, under the id L2L's catalog stages it as (drivechain-frontends
+            // `netcatalog/testdata/ecash-mainnet.json`, 2026-10-22). Its arrival is what turns the
+            // network on in installed apps (`EcashMainnetLaunch.isOffered`).
+            case "ecash-mainnet": return .ecashMainnet
             default:
                 // The dry runs before alphanet were published under rotating ids (drynet2 → 3 → 4),
                 // all of which were `.ecash`. Kept so an old payload still resolves; no new

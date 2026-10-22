@@ -25,6 +25,9 @@ enum CoinNewsAvailability {
             // Same rule as alphanet: available exactly when the remote config supplies a coinnews
             // URL for it, so the News tab appears on its own with no app update. Nil today.
             return CoinNewsEndpointRegistry.publicEndpoint(for: .ecashBeta) != nil
+        case .ecashMainnet:
+            // Real fork: same rule — on exactly when the config supplies a `coinnews` URL for it.
+            return CoinNewsEndpointRegistry.publicEndpoint(for: .ecashMainnet) != nil
         case .thunder: return false          // Thunder has no CoinNews
         }
     }

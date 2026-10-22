@@ -1,8 +1,46 @@
 # Moving to the real eCash fork
 
-**Status:** 📋 CHECKLIST — written 2026-09-29, ahead of the real fork (expected within ~a month).
-Alphanet and betanet are test generations that will be phased out; the real fork is the chain that
-holds real ECX. This is what has to change in the app, and in what order.
+**Status:** 🟢 CASE ADDED 2026-10-22 — `WalletNetwork.ecashMainnet` is in the app, gated on the remote
+config (below). Written 2026-09-29 ahead of the real fork. Alphanet and betanet are test generations;
+**betanet keeps running beside the real fork** (Jake, 2026-10-22) and its case is never repurposed.
+The real fork is the chain that holds real ECX.
+
+## What is wired (2026-10-22)
+
+Read from the node (github.com/ecash-com/bitcoin master) and from L2L's catalog staging
+(LayerTwo-Labs/drivechain-frontends `sidechain-orchestrator/config/netcatalog`, fixture
+`testdata/ecash-mainnet.json`):
+
+| Value | Where | Source |
+|---|---|---|
+| config id **`ecash-mainnet`**, display "eCash Mainnet" | `RemoteEndpointConfig.walletNetwork` allow-list | L2L fixture (`TestParseReadsTheECashMainnetRow`) |
+| fork height **973,728** | `NetworkRegistry.forkHeight` fallback; config `fork_height` wins | node `consensus.EcashHeight` |
+| replay marker **`499_999_998`** (`LOCKTIME_THRESHOLD - 2`) | `NetworkRegistry.replayProtectionLockHeight`, compiled | node `IsFinalTx`; the config's new `replay_lock_time` field is NOT read (unsigned) |
+| `OP_DRIVECHAIN` = **NOP8 (0xb7)** | `Drivechain.opcode` | node `script.h` |
+| magic `eca5dcb7`, HRP `bc`, prefixes = Bitcoin | BDK `Network.bitcoin`, coin-type `0'`, ECX/szat | node `chainparams.cpp` |
+| chip = the eCash brand **amber**; alphanet moved to **slate** | `NetworkChipStyle`, `netEcashLegacy` colorset | design (amber now means real ECX) |
+| real money: `isMainnet == true` | extra send confirm + warnings ("Real eCash") | §2 |
+| bundled endpoints `esplora.ecash.ninja` / `explorer.ecash.ninja` / `seed.ecash.eu.com/enforcer` | offline fallback ONLY — unverified pattern guesses | config overrides them |
+
+**The two gates (`EcashMainnetLaunch`, WalletService):**
+1. **Offered** — the network is in no picker (create/import/copy) until the config has delivered a
+   backend for `ecash-mainnet` (`WalletManager.hasRemoteBackendDefault`). Publishing the entry turns
+   it on in every installed copy; no release.
+2. **Default** — `WalletNetwork.currentEcash` stays betanet until the chain is observed at or past the
+   mainnet entry's `fork_height`. `ForkWatch` (app) asks `/blocks/tip/height` on the mainnet entry's
+   Esplora, then Bitcoin's (pre-fork they are one chain), on every launch/resume once gate 1 is open,
+   and latches `recordObservedTip`. Betanet's tip is never consulted (it is already past 973,728 on
+   its own chain).
+
+**Still open:** Thunder on mainnet (`.thunder` is wired to betanet's index; needs its own case +
+index URL, and the config carries nothing about Thunder — §1 table); a fiat price provider for real
+ECX (`PriceProviderRegistry`, product choice); sidechain deposits on real money stay behind the
+on-chain proof (§2); migration nudge "open this betanet wallet on eCash" (§4); retiring alphanet from
+`selectable` once L2L turns it off (the live config already dropped its entry on 2026-10-22).
+
+---
+
+The original analysis follows.
 
 Built from a sweep of the code for every per-network decision (every `switch` on `WalletNetwork`,
 every betanet URL / height / id), plus the upstream enforcer and BitWindow sources.
@@ -127,7 +165,7 @@ What already carries over, and what doesn't:
 
 1. The real fork's config `id` and `display_name`.
 2. Its `OP_DRIVECHAIN` opcode (NOP5 or NOP8).
-3. Fork height: 964,000 (CLAUDE.md §1), or has it moved?
+3. ~~Fork height: 964,000 (CLAUDE.md §1), or has it moved?~~ Answered: 973,728 (node `consensus.EcashHeight`).
 4. ~~The nLockTime replay-protection marker.~~ Decided: `499_999_998` (one below the test forks).
 5. Hosted enforcer, Esplora, Electrum, explorer and CoinNews URLs; is the enforcer public for
    mobile use?

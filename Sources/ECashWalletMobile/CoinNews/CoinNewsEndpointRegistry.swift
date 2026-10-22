@@ -42,6 +42,9 @@ enum CoinNewsEndpointRegistry {
             // Betanet: same as alphanet — nothing bundled; the remote overlay supplies it if one
             // appears (the live config currently publishes `coinnews: {url: null}` for both).
             return nil
+        case .ecashMainnet:
+            // Real fork: nothing bundled; the config's `ecash-mainnet` entry supplies it if L2L runs one.
+            return nil
         case .thunder:
             return nil   // Thunder has no CoinNews indexer
         }

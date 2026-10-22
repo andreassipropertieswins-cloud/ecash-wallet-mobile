@@ -131,6 +131,26 @@ public enum NetworkRegistry {
                 defaultBackendKind: "esplora",
                 explorerTxTemplate: "https://explorer.beta.ecash.ninja/tx/{txid}",
                 displayName: "Betanet")
+        case .ecashMainnet:
+            // The **real eCash mainnet** (fork of Bitcoin at 973,728). Derivation-identical to the test
+            // forks: Bitcoin bytes, `bc` HRP, coin-type `0'`, ECX. Its consensus differences (replay
+            // marker, fork height, opcode) live below, compiled — never in config.
+            //
+            // These bundled endpoints are an UNVERIFIED best guess from L2L's naming pattern
+            // (alphanet `esplora.alpha.ecash.ninja`, betanet `esplora.beta.ecash.ninja`) and are only
+            // the offline fallback: the network is not even offered until the remote config has
+            // delivered its `ecash-mainnet` entry (`EcashMainnetLaunch.isOffered`), at which point
+            // the config's backend wins over these. If the guess is wrong, a sync fails loudly; it
+            // can't point a wallet at the wrong chain, because nothing else serves eCash mainnet.
+            return NetworkParams(
+                coinType: Int32(0),
+                addressHRP: "bc",
+                unitLabel: "ECX",
+                subUnitLabel: "szat",
+                defaultBackend: "https://esplora.ecash.ninja",
+                defaultBackendKind: "esplora",
+                explorerTxTemplate: "https://explorer.ecash.ninja/tx/{txid}",
+                displayName: "eCash")
         case .thunder:
             // Thunder sidechain — ed25519/BLAKE3, NOT BDK. `coinType`/`addressHRP` are unused fillers
             // (the Thunder engine never derives via BDK). Unit is **ECX** — Thunder holds eCash value
@@ -181,8 +201,14 @@ public enum NetworkRegistry {
     /// consumed only by `WalletEngine` at build time, never bridged.
     static func replayProtectionLockHeight(for network: WalletNetwork) -> UInt32? {
         switch network {
-        case .ecash, .ecashBeta: return UInt32(499_999_999)   // LOCKTIME_THRESHOLD - 1
-        // The real eCash mainnet case, when added, uses 499_999_998 (one lower) — NOT this value.
+        case .ecash, .ecashBeta: return UInt32(499_999_999)   // LOCKTIME_THRESHOLD - 1: the test forks
+        // The REAL fork is one lower: ecash-com/bitcoin master treats `nLockTime == LOCKTIME_THRESHOLD - 2`
+        // as always-final (tx_check / IsFinalTx, read 2026-10-21). The test forks' value is a block
+        // height ~500M blocks out on the real chain, so a tx stamped 499_999_999 would be rejected as
+        // non-final there — the two values are NOT interchangeable. Compiled on purpose: the remote
+        // config now publishes `replay_lock_time` too, but it is unsigned, and a wrong value here is
+        // the difference between an eCash send and one that replays onto Bitcoin.
+        case .ecashMainnet: return UInt32(499_999_998)        // LOCKTIME_THRESHOLD - 2: the real fork
         case .bitcoin, .signet, .thunder: return nil
         }
     }
@@ -201,9 +227,9 @@ public enum NetworkRegistry {
     /// The **fork height**: transactions confirmed BELOW this block are pre-fork (inherited from
     /// Bitcoin), used to mark them in history. Coin-splitting no longer classifies by height — it asks
     /// Bitcoin's explorer (`SplitSummary.classify`). `.ecash` is **alphanet → 963_648** and
-    /// `.ecashBeta` is **betanet → 967_680**; the real eCash mainnet fork is block **964_000**
-    /// (CLAUDE.md). nil for non-forks (Bitcoin/Signet/Thunder). Internal: used by
-    /// `WalletEngine.transactions`.
+    /// `.ecashBeta` is **betanet → 967_680**; `.ecashMainnet` is the real fork → **973_728**
+    /// (`consensus.EcashHeight`, ecash-com/bitcoin master). nil for non-forks (Bitcoin/Signet/Thunder).
+    /// Internal: used by `WalletEngine.transactions`.
     static func forkHeight(for network: WalletNetwork) -> Int64? {
         switch network {
         // Fallbacks only — the live values come from the remote config per chain, which is what
@@ -211,6 +237,7 @@ public enum NetworkRegistry {
         // eCash networks.
         case .ecash: return Int64(963_648)       // alphanet
         case .ecashBeta: return Int64(967_680)   // betanet
+        case .ecashMainnet: return Int64(973_728) // the real fork (ecash-com/bitcoin `EcashHeight`)
         case .bitcoin, .signet, .thunder: return nil
         }
     }

@@ -22,6 +22,11 @@ enum PriceProviderRegistry {
             return nil
         case .ecashBeta:
             return nil   // betanet coins have no market either
+        case .ecashMainnet:
+            // Real ECX has markets (the Dashboard's Markets card quotes them), but a per-wallet fiat
+            // line needs a provider chosen deliberately (which venue, which currencies). Product
+            // decision; nil until then — no fiat line, same as before the fork.
+            return nil
         case .thunder:
             return nil   // Thunder (test) coins have no fiat price
         }

@@ -10,7 +10,7 @@
 
 ## 1. What this is
 
-A native mobile Bitcoin wallet — **eCash.com Wallet** — for **eCash**, the Layer Two Labs Bitcoin hardfork that activates Drivechain (CUSF BIP300/BIP301) at block 964,000 (August 2026), airdropping eCash 1:1 to BTC holders. This wallet is the user-facing way to hold, send, and receive coins on that network.
+A native mobile Bitcoin wallet — **eCash.com Wallet** — for **eCash**, the Layer Two Labs Bitcoin hardfork that activates Drivechain (CUSF BIP300/BIP301) at block **973,728** (`consensus.EcashHeight` in github.com/ecash-com/bitcoin; expected ≈ 2026-10-29), airdropping eCash 1:1 to BTC holders. The real fork is `WalletNetwork.ecashMainnet` (added 2026-10-22), gated on the remote config (`EcashMainnetLaunch`, `docs/real-ecash-fork-transition.md`); alphanet/betanet are the test forks that preceded it and keep running beside it. This wallet is the user-facing way to hold, send, and receive coins on that network.
 
 **v1 scope (this milestone):** the fundamentals, **multi-wallet and multi-network from day one**.
 

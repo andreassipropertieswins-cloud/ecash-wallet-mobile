@@ -27,7 +27,7 @@ enum FastWithdrawalConfig {
                             sidechainID: "thunder",
                             operatorName: "L2L",
                             pinnedQuoteKeyBase64: nil)
-        case .bitcoin, .signet, .ecash, .ecashBeta:
+        case .bitcoin, .signet, .ecash, .ecashBeta, .ecashMainnet:
             return nil   // not sidechains
         }
     }
