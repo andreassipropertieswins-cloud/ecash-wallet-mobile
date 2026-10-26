@@ -451,8 +451,9 @@ public final class WalletManager: @unchecked Sendable {
         return stored
     }
 
-    /// Test seam: set/clear the stored display name without a manager instance.
-    static func setRemoteDisplayNameForTesting(_ name: String?, network: WalletNetwork) {
+    /// Test seam: set/clear the stored display name without a manager instance. Public (bridged)
+    /// so the app's tests can stage config names too.
+    public static func setRemoteDisplayNameForTesting(_ name: String?, network: WalletNetwork) {
         if let name, !name.isEmpty {
             UserDefaults.standard.set(name, forKey: remoteDisplayNameKey(network))
         } else {

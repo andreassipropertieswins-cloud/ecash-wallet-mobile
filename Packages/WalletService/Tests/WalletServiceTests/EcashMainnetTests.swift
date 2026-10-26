@@ -90,6 +90,17 @@ final class EcashMainnetTests: XCTestCase {
 
     // MARK: - Launch gates
 
+    /// Picker order (Jake, 2026-10-26): eCash chains first, then Bitcoin, then the dev networks;
+    /// the real fork slots in after betanet once offered. The default is `currentEcash`, not position.
+    func testPickerOrderPutsTheECashChainsFirst() {
+        XCTAssertEqual(WalletNetwork.selectable,
+                       [WalletNetwork.ecashBeta, WalletNetwork.bitcoin, WalletNetwork.signet, WalletNetwork.thunder])
+        EcashMainnetLaunch.resetForTesting(offered: true)
+        XCTAssertEqual(WalletNetwork.selectable,
+                       [WalletNetwork.ecashBeta, WalletNetwork.ecashMainnet, WalletNetwork.bitcoin,
+                        WalletNetwork.signet, WalletNetwork.thunder])
+    }
+
     func testHiddenUntilTheConfigPublishesIt() {
         XCTAssertFalse(EcashMainnetLaunch.isOffered)
         XCTAssertFalse(WalletNetwork.selectable.contains(WalletNetwork.ecashMainnet))

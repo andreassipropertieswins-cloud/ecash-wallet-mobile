@@ -13,6 +13,24 @@ import WalletService
 struct NetworkSelector: View {
     @Binding var network: WalletNetwork
 
+    /// The picker row: `<name> (<unit>)` — "eCash Betanet (ECX)", "eCash (ECX)", "Bitcoin (BTC)".
+    ///
+    /// The name is the network's display name (remote config `display_name` when present), with
+    /// the eCash test forks branded "eCash …" so a row like the config's bare "Betanet" reads as the
+    /// eCash chain it is. The real fork's name already IS "eCash", so it gets no prefix, and a
+    /// config name that already starts with "eCash" is never doubled. Chips keep the short name.
+    static func label(for network: WalletNetwork) -> String {
+        let params = NetworkRegistry.params(for: network)
+        var name = params.displayName
+        switch network {
+        case .ecashBeta, .ecash:
+            if !name.lowercased().hasPrefix("ecash") { name = "eCash " + name }
+        case .bitcoin, .signet, .ecashMainnet, .thunder:
+            break
+        }
+        return "\(name) (\(params.unitLabel))"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.x2) {
             Text("Network", bundle: .module, comment: "network selector label")
@@ -21,7 +39,7 @@ struct NetworkSelector: View {
 
             Picker("Network", selection: $network) {
                 ForEach(WalletNetwork.selectable, id: \.self) { net in
-                    Text(verbatim: NetworkRegistry.params(for: net).displayName).tag(net)
+                    Text(verbatim: NetworkSelector.label(for: net)).tag(net)
                 }
             }
             .pickerStyle(.menu)

@@ -91,6 +91,20 @@ import WalletService
         #expect(dash.walletNetwork == .ecashMainnet)
     }
 
+    /// After the fork the real chain is the default for create and import; before it, betanet. The
+    /// picker ORDER never moves (Jake, 2026-10-26) — only the default does. Lives here, not in
+    /// `NetworkSelectorLabelTests`, because this suite owns the launch-gate state.
+    @Test func defaultFollowsTheForkButTheOrderDoesNot() {
+        Self.reset()
+        EcashMainnetLaunch.resetForTesting(offered: true)
+        #expect(WalletNetwork.currentEcash == .ecashBeta)
+        #expect(WalletNetwork.selectable.prefix(3) == [.ecashBeta, .ecashMainnet, .bitcoin])
+        EcashMainnetLaunch.recordObservedTip(height: EcashMainnetLaunch.forkHeight)
+        #expect(WalletNetwork.currentEcash == .ecashMainnet)
+        #expect(WalletNetwork.selectable.prefix(3) == [.ecashBeta, .ecashMainnet, .bitcoin])
+        Self.reset()
+    }
+
     // MARK: - The fork watcher
 
     private static func fetcher(tips: [String: String]) -> DashboardFetch {
