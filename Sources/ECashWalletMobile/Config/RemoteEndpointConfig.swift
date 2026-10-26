@@ -89,12 +89,21 @@ struct RemoteEndpointConfig: Equatable, Sendable {
             switch id {
             case "bitcoin": return .bitcoin
             case "signet": return .signet
+            // Alphanet is retired (dropped from the config and from the pickers, 2026-10-26); the
+            // mapping stays only so existing alphanet wallets would pick up endpoints if it were
+            // ever republished.
             case "alphanet": return .ecash
             case "betanet": return .ecashBeta
-            // The real fork, under the id L2L's catalog stages it as (drivechain-frontends
-            // `netcatalog/testdata/ecash-mainnet.json`, 2026-10-22). Its arrival is what turns the
-            // network on in installed apps (`EcashMainnetLaunch.isOffered`).
-            case "ecash-mainnet": return .ecashMainnet
+            // The real fork. drivechain.dev/config published it 2026-10-26 as **`ecash`** (display
+            // "eCash", fork 973728, magic eca5dcb7); L2L's catalog fixture had staged it as
+            // `ecash-mainnet` (drivechain-frontends `netcatalog/testdata/ecash-mainnet.json`), kept
+            // in case they rename. Either id turns the network on in installed apps
+            // (`EcashMainnetLaunch.isOffered`).
+            //
+            // NOTE: the config id `ecash` is NOT the enum rawValue `"ecash"` — that rawValue is the
+            // retired alphanet case `.ecash`. Config ids and persisted rawValues are separate
+            // namespaces; this allow-list is the only bridge, and it points `ecash` at the REAL fork.
+            case "ecash", "ecash-mainnet": return .ecashMainnet
             default:
                 // The dry runs before alphanet were published under rotating ids (drynet2 → 3 → 4),
                 // all of which were `.ecash`. Kept so an old payload still resolves; no new

@@ -16,14 +16,14 @@ struct ImportWalletView: View {
     let defaultName: String
     @State var vm: ImportViewModel   // not `private` — Fuse bridges @State to Compose (skip-fuse rule)
     @State var walletName = ""
-    // Default: eCash (alphanet). Changed from .signet 2026-08-28 — eCash is the network this app
+    // Default: the current eCash chain (`currentEcash`). Changed from .signet 2026-08-28 — eCash is the network this app
     // exists for, and a signet default meant most users' first wallet was on the wrong chain.
     // Still never Bitcoin: mainnet stays a deliberate choice (Golden Rule §4).
     //
     // NOTE for whoever moves `.ecash` off the dry-run chain: the case follows the remote config,
     // which points at alphanet today (test value). When it rolls to real eCash mainnet, THIS LINE
     // silently becomes "default to real money" — revisit it then.
-    @State var network: WalletNetwork = .ecash
+    @State var network: WalletNetwork = .currentEcash
     @State var advancedExpanded = false           // Advanced: import type (+ later, derivation path)
 
     // iOS-only keyboard ergonomics (focus advance + scroll-to-dismiss). Guarded so the Android

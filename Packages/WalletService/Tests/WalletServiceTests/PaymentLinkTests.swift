@@ -27,7 +27,10 @@ final class PaymentLinkTests: XCTestCase {
     /// The strict mapping: a scheme is a statement about the chain, and we honor it.
     func testSchemeSelectsTheNetwork() {
         XCTAssertEqual(PaymentLink.routing(scheme: .bitcoin, address: "bc1qabc").networks, [WalletNetwork.bitcoin])
-        XCTAssertEqual(PaymentLink.routing(scheme: .ecash, address: "bc1qabc").networks, [WalletNetwork.ecash])
+        // `ecash:` means the live eCash forks — the real one and betanet — never retired alphanet.
+        XCTAssertEqual(PaymentLink.routing(scheme: .ecash, address: "bc1qabc").networks,
+                       [WalletNetwork.ecashMainnet, WalletNetwork.ecashBeta])
+        XCTAssertFalse(PaymentLink.routing(scheme: .ecash, address: "bc1qabc").networks.contains(WalletNetwork.ecash))
     }
 
     /// A bare mainnet-class address is valid on BOTH chains and nothing says which — so we ask
@@ -35,7 +38,7 @@ final class PaymentLinkTests: XCTestCase {
     func testBareAddressIsAmbiguousAcrossBitcoinAndECash() {
         let routing = PaymentLink.routing(scheme: PaymentScheme.none, address: "bc1qabc")
         XCTAssertTrue(routing.isAmbiguous)
-        XCTAssertEqual(routing.networks, [WalletNetwork.bitcoin, WalletNetwork.ecash])
+        XCTAssertEqual(routing.networks, [WalletNetwork.bitcoin, WalletNetwork.ecashMainnet, WalletNetwork.ecashBeta])
         XCTAssertNil(routing.rejection)
     }
 

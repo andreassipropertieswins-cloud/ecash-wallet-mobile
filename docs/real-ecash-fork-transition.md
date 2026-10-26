@@ -1,7 +1,8 @@
 # Moving to the real eCash fork
 
-**Status:** 🟢 CASE ADDED 2026-10-22 — `WalletNetwork.ecashMainnet` is in the app, gated on the remote
-config (below). Written 2026-09-29 ahead of the real fork. Alphanet and betanet are test generations;
+**Status:** 🟢 LIVE IN CONFIG 2026-10-26 — drivechain.dev/config publishes the real fork as id **`ecash`**
+(not the staged `ecash-mainnet`; 1.4.4 only knew the staged spelling, 1.4.5 maps both). `WalletNetwork.ecashMainnet`
+was added 2026-10-22, gated on the remote config (below). Alphanet retired from the pickers 2026-10-26. Written 2026-09-29 ahead of the real fork. Alphanet and betanet are test generations;
 **betanet keeps running beside the real fork** (Jake, 2026-10-22) and its case is never repurposed.
 The real fork is the chain that holds real ECX.
 
@@ -13,7 +14,7 @@ Read from the node (github.com/ecash-com/bitcoin master) and from L2L's catalog 
 
 | Value | Where | Source |
 |---|---|---|
-| config id **`ecash-mainnet`**, display "eCash Mainnet" | `RemoteEndpointConfig.walletNetwork` allow-list | L2L fixture (`TestParseReadsTheECashMainnetRow`) |
+| config id **`ecash`** (LIVE 2026-10-26, display "eCash"; the staged `ecash-mainnet` spelling also maps) | `RemoteEndpointConfig.walletNetwork` allow-list | drivechain.dev/config |
 | fork height **973,728** | `NetworkRegistry.forkHeight` fallback; config `fork_height` wins | node `consensus.EcashHeight` |
 | replay marker **`499_999_998`** (`LOCKTIME_THRESHOLD - 2`) | `NetworkRegistry.replayProtectionLockHeight`, compiled | node `IsFinalTx`; the config's new `replay_lock_time` field is NOT read (unsigned) |
 | `OP_DRIVECHAIN` = **NOP8 (0xb7)** | `Drivechain.opcode` | node `script.h` |
@@ -24,7 +25,7 @@ Read from the node (github.com/ecash-com/bitcoin master) and from L2L's catalog 
 
 **The two gates (`EcashMainnetLaunch`, WalletService):**
 1. **Offered** — the network is in no picker (create/import/copy) until the config has delivered a
-   backend for `ecash-mainnet` (`WalletManager.hasRemoteBackendDefault`). Publishing the entry turns
+   backend for `.ecashMainnet` (`WalletManager.hasRemoteBackendDefault`). Publishing the entry turns
    it on in every installed copy; no release.
 2. **Default** — `WalletNetwork.currentEcash` stays betanet until the chain is observed at or past the
    mainnet entry's `fork_height`. `ForkWatch` (app) asks `/blocks/tip/height` on the mainnet entry's
@@ -35,8 +36,9 @@ Read from the node (github.com/ecash-com/bitcoin master) and from L2L's catalog 
 **Still open:** Thunder on mainnet (`.thunder` is wired to betanet's index; needs its own case +
 index URL, and the config carries nothing about Thunder — §1 table); a fiat price provider for real
 ECX (`PriceProviderRegistry`, product choice); sidechain deposits on real money stay behind the
-on-chain proof (§2); migration nudge "open this betanet wallet on eCash" (§4); retiring alphanet from
-`selectable` once L2L turns it off (the live config already dropped its entry on 2026-10-22).
+on-chain proof (§2); migration nudge "open this betanet wallet on eCash" (§4); alphanet is DONE —
+retired from `selectable` 2026-10-26 (case kept for existing wallets; `ecash:` payment links now route to
+mainnet + betanet, never alphanet).
 
 ---
 

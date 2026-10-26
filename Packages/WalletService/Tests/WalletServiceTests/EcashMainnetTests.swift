@@ -80,6 +80,14 @@ final class EcashMainnetTests: XCTestCase {
         XCTAssertEqual(Drivechain.opcode(for: WalletNetwork.ecashMainnet), UInt8(0xb7))
     }
 
+    /// Alphanet (`.ecash`) was retired 2026-10-26: never offered, but its persisted rawValue must
+    /// keep decoding so existing alphanet wallets load.
+    func testAlphanetIsRetiredButStillDecodes() {
+        XCTAssertFalse(WalletNetwork.selectable.contains(WalletNetwork.ecash))
+        XCTAssertEqual(WalletNetwork(rawValue: "ecash"), WalletNetwork.ecash)
+        XCTAssertNotEqual(WalletNetwork.ecash, WalletNetwork.ecashMainnet)
+    }
+
     // MARK: - Launch gates
 
     func testHiddenUntilTheConfigPublishesIt() {

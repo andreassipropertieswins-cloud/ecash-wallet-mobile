@@ -108,9 +108,12 @@ import WalletService
         #expect(WalletNetwork(rawValue: "ecash") == .ecash)
     }
 
-    @Test func betanetIsOfferedInThePicker() {
+    /// Alphanet was retired 2026-10-26: not creatable, but its case (and rawValue) survive so
+    /// existing alphanet wallets still load.
+    @Test func betanetIsOfferedInThePickerAndAlphanetIsNot() {
         #expect(WalletNetwork.selectable.contains(.ecashBeta))
-        #expect(WalletNetwork.selectable.contains(.ecash))
+        #expect(!WalletNetwork.selectable.contains(.ecash))
+        #expect(WalletNetwork.allCases.contains(.ecash))
     }
 
     /// Both are Bitcoin-identical, so one seed derives the SAME addresses on each — the chip is the

@@ -107,13 +107,13 @@ public enum WalletNetwork: String, Equatable, Hashable, Sendable, CaseIterable {
     case bitcoin
     /// L2L dev network; first-class in BDK.
     case signet
-    /// The eCash fork. Currently backed by the **drynet2** dry-run chain (see
-    /// `NetworkRegistry`); the case is named `.ecash` now — its rawValue is persisted in the
-    /// wallet store + backend-override keys — so it survives the eventual drynet2→eCash rename
-    /// without a data migration. eCash is byte-identical to Bitcoin (mainnet `bc` HRP,
-    /// coin-type `0'`), so it maps to BDK `Network.bitcoin`; it is separated from Bitcoin only
-    /// by its backend. Unit label is **ECX**. (See `docs/key-derivation.md`, memory
-    /// `drynet2-ecash-network`.)
+    /// **Alphanet — RETIRED 2026-10-26.** The first eCash test fork (after the drynet dry runs).
+    /// Not in `selectable` and no longer in the remote config; the case exists only because its
+    /// rawValue `"ecash"` is persisted in existing wallets' metadata and backend-override keys, so
+    /// those wallets keep loading. Do NOT read this case as "the real eCash" — that is
+    /// `.ecashMainnet`; the remote config's id `ecash` maps THERE, not here (see
+    /// `RemoteEndpointConfig.RemoteNetwork.walletNetwork(forId:)`). Byte-identical to Bitcoin
+    /// (`bc` HRP, coin-type `0'`, BDK `Network.bitcoin`), unit **ECX**.
     case ecash
     /// The eCash **betanet** — the successor chain to alphanet, running alongside it for a while
     /// before it takes over (and before the real eCash mainnet after that). Same shape as `.ecash`
@@ -144,7 +144,7 @@ public enum WalletNetwork: String, Equatable, Hashable, Sendable, CaseIterable {
     ///
     /// **Gated on the remote config, not a release** (`EcashMainnetLaunch`): the case is compiled in
     /// ahead of the fork, but it is NOT offered in any picker until drivechain.dev/config publishes the
-    /// `ecash-mainnet` entry, and it does NOT become the default eCash network until the chain is
+    /// `ecash` entry (published 2026-10-26), and it does NOT become the default eCash network until the chain is
     /// observed past the entry's `fork_height`. Betanet keeps running alongside it either way — its
     /// case is never repurposed (a wallet's network is persisted by rawValue).
     case ecashMainnet
@@ -162,10 +162,12 @@ public enum WalletNetwork: String, Equatable, Hashable, Sendable, CaseIterable {
     /// **eCash mainnet is listed only once the remote config publishes it** (`EcashMainnetLaunch.isOffered`),
     /// so the picker can't offer a network the app has no live endpoint for.
     public static var selectable: [WalletNetwork] {
+        // Alphanet (`.ecash`) was retired 2026-10-26: gone from the remote config, so it is gone
+        // from here. The case stays because its rawValue is persisted in existing wallets, which
+        // keep loading (and can be removed or copied to betanet/mainnet); nobody can create one.
         var out: [WalletNetwork] = [
             .bitcoin,
             .signet,
-            .ecash,
             .ecashBeta,
         ]
         if EcashMainnetLaunch.isOffered {

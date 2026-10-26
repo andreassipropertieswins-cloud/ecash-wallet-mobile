@@ -13,15 +13,16 @@ import WalletService
 /// and that the fork watcher flips the default only on a tip at or past the entry's fork height.
 @Suite(.serialized) struct EcashMainnetConfigTests {
 
-    /// L2L's staged fixture, trimmed to what matters. Mainnet FIRST, as they order it.
+    /// The live drivechain.dev/config entry (2026-10-26), trimmed to what matters, with the
+    /// not-yet-published services filled in so the per-network routing is exercised. Mainnet FIRST.
     private static let staged = """
     {
       "schema_version": 1,
       "networks": [
         { "id": "bitcoin", "family": "bitcoin", "display_name": "Bitcoin",
           "backends": [ { "kind": "esplora", "url": "https://esplora.mainnet.drivechain.info" } ] },
-        { "id": "ecash-mainnet", "family": "ecash", "display_name": "eCash Mainnet",
-          "fork_height": 973728, "network_magic": "eca5dcb7", "replay_lock_time": 499999998,
+        { "id": "ecash", "family": "ecash", "display_name": "eCash",
+          "fork_height": 973728, "network_magic": "eca5dcb7",
           "backends": [ { "kind": "esplora", "url": "https://esplora.mainnet.ecash.example" } ],
           "explorer_tx_template": "https://explorer.mainnet.ecash.example/tx/{txid}",
           "services": { "enforcer": { "url": "https://seed.mainnet.ecash.example/enforcer" } } },
@@ -58,7 +59,7 @@ import WalletService
         #expect(heights.first { $0.network == .ecashBeta }?.height == 967_680)
 
         let names = cfg.resolvedDisplayNames()
-        #expect(names.first { $0.network == .ecashMainnet }?.name == "eCash Mainnet")
+        #expect(names.first { $0.network == .ecashMainnet }?.name == "eCash")
         #expect(names.first { $0.network == .ecashBeta }?.name == "Betanet")
 
         let enforcers = cfg.resolvedEnforcers()
@@ -66,9 +67,26 @@ import WalletService
         #expect(enforcers.first { $0.network == .ecashBeta } == nil, "betanet's entry carries no enforcer here")
     }
 
-    /// The dashboard block uses the same allow-list, so `"ecash-mainnet"` there means the same case.
+    /// L2L's catalog fixture staged the fork as `ecash-mainnet`; that spelling still lands on the
+    /// same case in case the served config is ever renamed to match.
+    @Test func theStagedSpellingStillReachesMainnet() throws {
+        let cfg = try Self.parse(Self.staged.replacingOccurrences(of: "\"id\": \"ecash\",", with: "\"id\": \"ecash-mainnet\","))
+        #expect(cfg.networks.compactMap(\.walletNetwork) == [.bitcoin, .ecashMainnet, .ecashBeta])
+    }
+
+    /// The config id `ecash` is NOT the retired alphanet case, whose persisted rawValue happens to
+    /// be the same string. Nothing from the live entry may reach `.ecash`.
+    @Test func theLiveIdNeverReachesAlphanet() throws {
+        let cfg = try Self.parse(Self.staged)
+        #expect(!cfg.networks.compactMap(\.walletNetwork).contains(.ecash))
+        #expect(cfg.resolvedPrimaryBackends().first { $0.network == .ecash } == nil)
+        #expect(cfg.resolvedForkHeights().first { $0.network == .ecash } == nil)
+        #expect(WalletNetwork(rawValue: "ecash") == .ecash, "the rawValue namespace is untouched")
+    }
+
+    /// The dashboard block uses the same allow-list, so `"ecash"` there means the same case.
     @Test func theDashboardIdMeansTheSameNetwork() {
-        let dash = DashboardNetwork(id: "ecash-mainnet", displayName: "eCash", explorerURL: "https://e.example",
+        let dash = DashboardNetwork(id: "ecash", displayName: "eCash", explorerURL: "https://e.example",
                                     releasesChannel: "mainnet")
         #expect(dash.walletNetwork == .ecashMainnet)
     }

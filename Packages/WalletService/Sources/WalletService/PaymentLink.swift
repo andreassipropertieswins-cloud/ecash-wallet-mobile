@@ -82,6 +82,12 @@ public enum PaymentLink {
         return a.hasPrefix("tb1") || a.hasPrefix("m") || a.hasPrefix("n") || a.hasPrefix("2")
     }
 
+    /// The eCash forks an `ecash:` link may be paid from: the real fork and betanet. Mainnet is
+    /// listed even before the config offers it — a wallet on it can't exist until then, so the
+    /// candidate filter in the app (`wallets.filter { networks.contains($0.network) }`) is what
+    /// decides. Alphanet (`.ecash`) is retired and deliberately absent.
+    public static let ecashNetworks: [WalletNetwork] = [WalletNetwork.ecashMainnet, WalletNetwork.ecashBeta]
+
     /// Decide which networks may pay this link.
     ///
     /// Scheme wins where it's present, per the strict mapping in docs §3.2 — a scheme is a statement
@@ -100,10 +106,10 @@ public enum PaymentLink {
         case .bitcoin:
             return PaymentLinkRouting(networks: [.bitcoin])
         case .ecash:
-            return PaymentLinkRouting(networks: [.ecash])
+            return PaymentLinkRouting(networks: ecashNetworks)
         case PaymentScheme.none:
             // No scheme, mainnet-class address: valid on both chains, and nothing says which.
-            return PaymentLinkRouting(networks: [.bitcoin, .ecash], isAmbiguous: true)
+            return PaymentLinkRouting(networks: [WalletNetwork.bitcoin] + ecashNetworks, isAmbiguous: true)
         }
     }
 
