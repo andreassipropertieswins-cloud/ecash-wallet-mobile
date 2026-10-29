@@ -1,4 +1,6 @@
-New wallets, imports, and ECX claims now use eCash Betanet — the network the project has moved to. Wallets you already hold on Alphanet are unchanged and keep working.
+eCash mainnet is now the default network. New wallets and imports start on eCash, and it is first in the network picker. eCash Betanet is still available for testing.
 
 Also in this release:
-• Fixed: coin splitting was unavailable on Betanet. The Home nudge and Settings row now appear there, classified against Betanet's own fork height.
+• Claim your ECX follows the wallet you have selected: a Betanet wallet claims on Betanet, an eCash wallet claims on eCash.
+• The Dashboard now reports on eCash mainnet: chain metrics, node releases, and news.
+• Fixed: on some devices eCash was missing from the New wallet and Import pickers until the app had been reopened.

@@ -62,10 +62,11 @@ lane :release do |options|
 
   assemble
 
+  # "What's New" comes from fastlane/metadata/en-US/release_notes.txt — update it per release
+  # (a hardcoded default here used to override that file with "Fixes and improvements.").
   upload_to_app_store(
     api_key_path: "fastlane/apikey.json",
-    app_rating_config_path: "fastlane/metadata/rating.json",
-    release_notes: { default: "Fixes and improvements." }
+    app_rating_config_path: "fastlane/metadata/rating.json"
   )
 end
 
