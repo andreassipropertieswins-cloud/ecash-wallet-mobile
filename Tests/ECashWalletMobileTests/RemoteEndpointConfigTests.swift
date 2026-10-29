@@ -577,9 +577,9 @@ import WalletService
     }
 
     @Test func theDashboardNetworkMapsToItsWalletNetwork() {
-        #expect(DashboardNetwork.betanet.walletNetwork == .ecashBeta)
-        let mainnet = DashboardNetwork(id: "mainnet", displayName: "Mainnet", explorerURL: "https://e.example", releasesChannel: "mainnet")
-        #expect(mainnet.walletNetwork == nil)   // no wallets for it yet → Coin News hidden
+        #expect(DashboardNetwork.mainnet.walletNetwork == .ecashMainnet)
+        let unknown = DashboardNetwork(id: "mainnet", displayName: "Mainnet", explorerURL: "https://e.example", releasesChannel: "mainnet")
+        #expect(unknown.walletNetwork == nil)   // not a config id this app knows → Coin News hidden
     }
 
     @Test func nameAndChannelDefaultToTheId() {
@@ -597,11 +597,15 @@ import WalletService
         #expect(config?.resolvedDashboardNetwork() == nil)
     }
 
-    @Test func noDashboardBlockMeansBetanet() {
+    /// The live config has never carried a `dashboard` block, so the bundled default IS the dashboard
+    /// network in practice: eCash mainnet since 2026-10-29 (betanet before).
+    @Test func noDashboardBlockMeansMainnet() {
         RemoteServiceOverrides.clearAll()
         defer { RemoteServiceOverrides.clearAll() }
         #expect(RemoteEndpointConfig.parse(Data(Self.validJSON.utf8))?.resolvedDashboardNetwork() == nil)
-        #expect(DashboardNetwork.current == .betanet)
+        #expect(DashboardNetwork.current == .mainnet)
+        #expect(DashboardNetwork.current.explorerURL == "https://explorer.ecash.ninja")
+        #expect(DashboardNetwork.current.releasesChannel == "mainnet")
     }
 
     @Test func theStoredDashboardNetworkRoundTripsAndReportsChanges() {

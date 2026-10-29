@@ -12,7 +12,7 @@
 |---|---|
 | D1 | The **News** tab becomes **Dashboard**. CoinNews stays, as a **section inside** the dashboard. |
 | D2 | **No eCash.com API.** Every number comes from a public source the app calls directly. |
-| D3 | The dashboard shows **one network**: **betanet now, mainnet as soon as it goes live**. No picker, not tied to the selected wallet. The switch is a remote-config value, so it flips at the fork with no app update (§4.6). |
+| D3 | The dashboard shows **one network**: **eCash mainnet** (since 1.4.6 build 44, 2026-10-29; betanet before). No picker, not tied to the selected wallet. A remote-config `dashboard` block can override it, but the live config has never carried one — so the bundled default was moved to mainnet rather than waiting on a fetch (§4.6, §10). |
 | D4 | **No CoinGecko.** Prices come from exchange/DEX tickers (§4.2). |
 
 ## 2. What we're recreating
@@ -269,8 +269,8 @@ Android emulator (fonts, bars and `List`s fail silently on Android — check by 
 | # | Question | Default if unanswered |
 |---|---|---|
 | O1 | **CoinNews on betanet:** there's no indexer, so the section is empty on the default network. Stand one up, or have the CoinNews section follow the *selected wallet's* network instead of the dashboard's network? | Follow the dashboard's network; show "not live on Betanet yet" |
-| O2 | **ECX implied price:** what exactly does "wbECX × 50, using 20M ECX" mean, and is it a number we want headlining the dashboard? | Show wbECX price as the headline, implied price as a secondary line |
-| O3 | Mainnet explorer URL at the fork (Oct 31) — needed for the config flip | Stay on betanet until the config says otherwise |
+| O2 | **ECX implied price:** what exactly does "wbECX × 50, using 20M ECX" mean, and is it a number we want headlining the dashboard? | CLOSED 2026-10-29: the card and the wbECX row were removed with betanet. No ECX price until real ECX is listed on a keyless venue (Gate.io and NonKYC had no ECX market that day) |
+| O3 | Mainnet explorer URL at the fork (Oct 31) — needed for the config flip | CLOSED 2026-10-29: `https://explorer.ecash.ninja` (verified: `/api/blocks/tip/height`, `/api/v1/blocks`, `/api/mempool`), releases channel `mainnet` (`releases.ecash.com/L1-ecash-bitcoin/mainnet/latest/release.json`, same fields). Bundled as `DashboardNetwork.mainnet` |
 | O4 | Should the Wallet tab's fiat price for eCash wallets use the same wbECX source? | No — out of scope here |
 | O5 | Attribution: do Gate/DexScreener/NonKYC terms require visible credit? | Credit each source in the Markets footnote |
 
@@ -307,3 +307,16 @@ Ecosystem / Development tabs, and any buy/swap/trade entry point (§3.6).
   "Unavailable" everywhere. Now Jupiter's price API (aggregated price + 24h change) with Orca's own pool
   API for volume, and Orca's pool price as the fallback when Jupiter is down (inverted only after
   checking the pool's two mints — it's quoted wbECX per USDC).
+
+## 11. Mainnet (2026-10-29, 1.4.6 build 44)
+
+- **Bundled network is now eCash mainnet** (`DashboardNetwork.mainnet`: id `ecash`, explorer
+  `https://explorer.ecash.ninja`, releases channel `mainnet`). The config `dashboard` block (§4.6) still
+  overrides when present; the live config has never had one, and the Android 1.4.6 picker report showed
+  what depending on a fetch costs, so the default no longer waits for it. Caches are keyed by id, so
+  nothing cached under `betanet.*` is shown.
+- **ECX price card and the wbECX market row removed.** wbECX was wrapped *betanet* ECX; real ECX is
+  not listed on Gate.io or NonKYC (checked that day). The Markets table (BTC/BCH/BSV/XEC/BTCB2) stays.
+  Jupiter/Orca code is gone — `git log -S wbECX` to recover it if an ECX market appears there.
+- Betanet and alphanet are no longer referenced by the dashboard. CoinNews still follows the selected
+  wallet's network, as before.

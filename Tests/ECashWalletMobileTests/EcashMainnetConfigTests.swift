@@ -92,16 +92,17 @@ import WalletService
     }
 
     /// After the fork the real chain is the default for create and import; before it, betanet. The
-    /// picker ORDER never moves (Jake, 2026-10-26) — only the default does. Lives here, not in
-    /// `NetworkSelectorLabelTests`, because this suite owns the launch-gate state.
-    @Test func defaultFollowsTheForkButTheOrderDoesNot() {
+    /// picker ORDER never moves and the default is the real fork before and after the fork latch
+    /// (Jake, 2026-10-29). Lives here, not in `NetworkSelectorLabelTests`, because this suite owns
+    /// the launch-gate state.
+    @Test func defaultIsMainnetAndTheOrderNeverMoves() {
         Self.reset()
         EcashMainnetLaunch.resetForTesting(offered: true)
-        #expect(WalletNetwork.currentEcash == .ecashBeta)
-        #expect(WalletNetwork.selectable.prefix(3) == [.ecashBeta, .ecashMainnet, .bitcoin])
+        #expect(WalletNetwork.currentEcash == .ecashMainnet)
+        #expect(WalletNetwork.selectable.prefix(3) == [.ecashMainnet, .ecashBeta, .bitcoin])
         EcashMainnetLaunch.recordObservedTip(height: EcashMainnetLaunch.forkHeight)
         #expect(WalletNetwork.currentEcash == .ecashMainnet)
-        #expect(WalletNetwork.selectable.prefix(3) == [.ecashBeta, .ecashMainnet, .bitcoin])
+        #expect(WalletNetwork.selectable.prefix(3) == [.ecashMainnet, .ecashBeta, .bitcoin])
         Self.reset()
     }
 
@@ -115,12 +116,18 @@ import WalletService
         }
     }
 
-    @Test func doesNothingUntilTheConfigOffersMainnet() async {
+    /// No config fetched yet (a first launch, or one whose fetch failed): the watcher still runs,
+    /// against the bundled mainnet Esplora — the same host the config publishes — so the default
+    /// flip at the fork does not depend on the fetch any more than the offer does (1.4.6 build 44).
+    @Test func watchesTheBundledEsploraBeforeTheConfigArrives() async {
         Self.reset()
-        RemoteServiceOverrides.setEsploraURL("https://esplora.mainnet.drivechain.info", for: .bitcoin)
-        let flipped = await ForkWatch.checkIfNeeded(fetch: Self.fetcher(tips: ["esplora.mainnet.drivechain.info": "999999"]))
+        #expect(ForkWatch.candidateBases() == ["https://esplora.ecash.ninja"])
+        var flipped = await ForkWatch.checkIfNeeded(fetch: Self.fetcher(tips: ["esplora.ecash.ninja": "973727"]))
         #expect(!flipped)
-        #expect(WalletNetwork.currentEcash == .ecashBeta)
+        #expect(WalletNetwork.currentEcash == .ecashMainnet)
+        flipped = await ForkWatch.checkIfNeeded(fetch: Self.fetcher(tips: ["esplora.ecash.ninja": "973728"]))
+        #expect(flipped)
+        #expect(WalletNetwork.currentEcash == .ecashMainnet)
         Self.reset()
     }
 
@@ -134,7 +141,7 @@ import WalletService
         // Mainnet's Esplora is down; Bitcoin's answers, below the height: not yet.
         var flipped = await ForkWatch.checkIfNeeded(fetch: Self.fetcher(tips: ["esplora.mainnet.drivechain.info": "973727\n"]))
         #expect(!flipped)
-        #expect(WalletNetwork.currentEcash == .ecashBeta)
+        #expect(WalletNetwork.currentEcash == .ecashMainnet)
 
         // The fork block arrives.
         flipped = await ForkWatch.checkIfNeeded(fetch: Self.fetcher(tips: ["esplora.mainnet.drivechain.info": "973728"]))
@@ -157,7 +164,7 @@ import WalletService
         }
         let failed = await ForkWatch.checkIfNeeded(fetch: { _ in throw DashboardError.http(503) })
         #expect(!failed)
-        #expect(WalletNetwork.currentEcash == .ecashBeta)
+        #expect(WalletNetwork.currentEcash == .ecashMainnet)
         Self.reset()
     }
 
@@ -166,7 +173,7 @@ import WalletService
         Self.reset()
         EcashMainnetLaunch.resetForTesting(offered: true)
         RemoteServiceOverrides.setEsploraURL("https://esplora.beta.ecash.ninja", for: .ecashBeta)
-        #expect(ForkWatch.candidateBases().isEmpty)
+        #expect(ForkWatch.candidateBases() == ["https://esplora.ecash.ninja"], "only mainnet's bundled Esplora")
         Self.reset()
     }
 

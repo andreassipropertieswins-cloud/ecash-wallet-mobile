@@ -10,23 +10,31 @@ import Foundation
 ///
 /// Two independent gates (both read from UserDefaults, written by the config-apply path):
 ///
-/// 1. **Offered** — the remote config has delivered a backend for `.ecashMainnet` (the `ecash-mainnet`
-///    entry on drivechain.dev/config). Until then the case is invisible: not in the create/import
-///    picker, not a copy-wallet target. Shipping the case ahead of the fork is what lets the entry
-///    turn the network on in every installed copy with no update.
-/// 2. **Default** — offered AND the chain has been observed at or past the entry's `fork_height`
-///    (`WalletManager.effectiveForkHeight`, i.e. the config's value with the compiled 973,728 as the
-///    fallback). Before that block the "mainnet" chain is still Bitcoin; defaulting new wallets there
-///    early would put them on a chain that doesn't exist yet. The app records the tip it observes via
-///    `recordObservedTip` and the result latches: a fork does not un-happen.
+/// 1. **Offered** — compiled on since 1.4.6 build 44 (`offeredInThisBuild`), OR the remote config has
+///    delivered a backend for `.ecashMainnet` (the `ecash` entry on drivechain.dev/config, published
+///    2026-10-26). The remote half is what turned the network on in builds 41–43 with no update;
+///    from build 44 the picker no longer waits on a fetch.
+/// 2. **Fork seen** (`isDefault`, historically "default") — offered AND the chain has been observed
+///    at or past the entry's `fork_height` (`WalletManager.effectiveForkHeight`, i.e. the config's
+///    value with the compiled 973,728 as the fallback). The app records the tip it observes via
+///    `recordObservedTip` and the result latches: a fork does not un-happen. **Since 1.4.6 build 44
+///    (2026-10-29) this no longer steers `WalletNetwork.currentEcash`**, which is the real fork
+///    unconditionally (Jake); the latch is kept as the app's record that the fork has happened.
 ///
-/// Betanet is untouched by either gate — it stays offered, and stays the default until the fork.
+/// Betanet is untouched by either gate — it stays offered, second in the picker.
 public enum EcashMainnetLaunch {
     private static let forkReachedKey = "ecashMainnet.forkReached"
 
-    /// The remote config has published an endpoint for eCash mainnet.
+    /// **Offered in this build regardless of the config** (2026-10-29). drivechain.dev/config
+    /// published the `ecash` entry on 2026-10-26 and the fork is hours away, so gating the picker
+    /// on a successful fetch only cost users the network: a launch whose first fetch failed or was
+    /// throttled showed no eCash mainnet until a later resume (reported on Android 1.4.6). The
+    /// remote gate below stays for the build 41–43 installs that still need it; here it is redundant.
+    public static let offeredInThisBuild = true
+
+    /// Offered: compiled in (above), or the remote config has published an endpoint for it.
     public static var isOffered: Bool {
-        WalletManager.hasRemoteBackendDefault(for: .ecashMainnet)
+        offeredInThisBuild || WalletManager.hasRemoteBackendDefault(for: .ecashMainnet)
     }
 
     /// Offered, and the chain has been seen past the mainnet fork height.

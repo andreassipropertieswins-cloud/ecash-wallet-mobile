@@ -12,7 +12,7 @@ import Testing
     /// A source whose answers and failures are set per test, counting calls.
     final class StubSource: DashboardDataSource, @unchecked Sendable {
         var chainResult: Result<ChainSnapshot, DashboardError> = .success(StubSource.chain)
-        var marketsResult: Result<MarketBoard, DashboardError> = .success(MarketBoard(quotes: [], wbECX: nil))
+        var marketsResult: Result<MarketBoard, DashboardError> = .success(MarketBoard(quotes: []))
         var newsResult: Result<[EcosystemNewsItem], DashboardError> = .success([])
         var releasesResult: Result<ReleaseInfo, DashboardError> = .success(ReleaseInfo(node: nil, wallet: nil))
         var chainCalls = 0
@@ -40,7 +40,7 @@ import Testing
 
     static func model(_ source: StubSource, cache: MemoryDashboardCache = MemoryDashboardCache(),
                       clock: Clock = Clock()) -> DashboardModel {
-        DashboardModel(network: .betanet, source: source, cache: cache, clock: { clock.now })
+        DashboardModel(network: .mainnet, source: source, cache: cache, clock: { clock.now })
     }
 
     @Test func oneFailingSourceLeavesTheOthersLoaded() async {
@@ -110,10 +110,10 @@ import Testing
     @Test func cachesAreKeyedByNetwork() async {
         let cache = MemoryDashboardCache()
         await Self.model(StubSource(), cache: cache).refresh()
-        #expect(cache.keys.allSatisfy { $0.hasPrefix("betanet.") })
-        let mainnet = DashboardNetwork(id: "mainnet", displayName: "Mainnet", explorerURL: "https://x", releasesChannel: "mainnet")
-        let flipped = DashboardModel(network: mainnet, source: StubSource(), cache: cache, clock: { 1 })
-        #expect(flipped.chain.value == nil)   // betanet's numbers never appear under mainnet
+        #expect(cache.keys.allSatisfy { $0.hasPrefix("ecash.") })
+        let other = DashboardNetwork(id: "betanet", displayName: "Betanet", explorerURL: "https://x", releasesChannel: "betanet")
+        let flipped = DashboardModel(network: other, source: StubSource(), cache: cache, clock: { 1 })
+        #expect(flipped.chain.value == nil)   // one network's numbers never appear under another's header
     }
 
     @Test func aScreenGoingAwayDoesNotCancelTheFetch() async {

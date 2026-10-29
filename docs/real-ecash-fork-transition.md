@@ -24,14 +24,25 @@ Read from the node (github.com/ecash-com/bitcoin master) and from L2L's catalog 
 | bundled endpoints `esplora.ecash.ninja` / `explorer.ecash.ninja` / `seed.ecash.eu.com/enforcer` | offline fallback ONLY — unverified pattern guesses | config overrides them |
 
 **The two gates (`EcashMainnetLaunch`, WalletService):**
-1. **Offered** — the network is in no picker (create/import/copy) until the config has delivered a
-   backend for `.ecashMainnet` (`WalletManager.hasRemoteBackendDefault`). Publishing the entry turns
-   it on in every installed copy; no release.
-2. **Default** — `WalletNetwork.currentEcash` stays betanet until the chain is observed at or past the
-   mainnet entry's `fork_height`. `ForkWatch` (app) asks `/blocks/tip/height` on the mainnet entry's
-   Esplora, then Bitcoin's (pre-fork they are one chain), on every launch/resume once gate 1 is open,
-   and latches `recordObservedTip`. Betanet's tip is never consulted (it is already past 973,728 on
+1. **Offered** — since 1.4.6 build 44 (2026-10-29) **compiled on** (`EcashMainnetLaunch.offeredInThisBuild`):
+   the entry was published 2026-10-26, and gating the picker on a successful fetch left a launch whose
+   first fetch failed or was throttled with no eCash mainnet until a later resume (the Android 1.4.6
+   report). builds 41–43 still open the gate remotely — a backend for `.ecashMainnet`
+   (`WalletManager.hasRemoteBackendDefault`) — which is kept as the second half of `isOffered`.
+2. **Default** — **since 1.4.6 build 44 (2026-10-29) `WalletNetwork.currentEcash` IS the real fork,
+   unconditionally, and it is first in the picker** (Jake: "no need to wait for fork on that"). Until
+   then it stayed betanet until the chain was observed at or past the mainnet entry's `fork_height`.
+   That observation still runs — `ForkWatch` (app) asks `/blocks/tip/height` on the mainnet entry's
+   Esplora (remote, else the bundled `esplora.ecash.ninja`), then Bitcoin's, on every launch/resume,
+   and latches `EcashMainnetLaunch.isDefault` — but the latch now steers nothing; it is the app's
+   record that the fork has happened. Betanet's tip is never consulted (it is already past 973,728 on
    its own chain).
+
+**Investor claims (2026-10-29):** "Claim your ECX" follows the **selected wallet's** eCash chain —
+betanet wallet → betanet, mainnet wallet → mainnet — and anything else (Bitcoin/Signet/Thunder/none)
+→ mainnet (`ClaimNetwork.target`). It does NOT use `currentEcash`, so a claim from a mainnet wallet in
+the hours before the fork still lands on mainnet. The Dashboard moved to mainnet the same day
+(`docs/dashboard-plan.md` §11).
 
 **Still open:** Thunder on mainnet (`.thunder` is wired to betanet's index; needs its own case +
 index URL, and the config carries nothing about Thunder — §1 table); a fiat price provider for real

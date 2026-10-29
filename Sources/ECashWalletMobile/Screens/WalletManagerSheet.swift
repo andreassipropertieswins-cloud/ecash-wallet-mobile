@@ -99,7 +99,8 @@ struct WalletManagerSheet: View {
                 case .claim:
                     ImportWalletView(viewModel: app.makeImportViewModel(),
                                      defaultName: app.nextClaimWalletName,
-                                     claimMode: true)
+                                     claimMode: true,
+                                     claimNetwork: ClaimNetwork.target(selected: app.selectedWallet?.network))
                 }
             }
         }

@@ -5,11 +5,12 @@
 import SwiftUI
 import WalletService
 
-/// The Dashboard tab (`docs/dashboard-plan.md`): the eCash network at a glance — ECX price, chain
-/// health, news (on-chain CoinNews and eCash.com), markets, releases.
+/// The Dashboard tab (`docs/dashboard-plan.md`): the eCash network at a glance — chain health, news
+/// (on-chain CoinNews and eCash.com), markets, releases. No ECX price card until real ECX is listed
+/// somewhere keyless (the Betanet wbECX card went with Betanet, 2026-10-29).
 ///
-/// Reports on `AppState.dashboard.network` (betanet until the config says mainnet), not the selected
-/// wallet's network. CoinNews is the exception: reading and posting are per-network and need a wallet
+/// Reports on `AppState.dashboard.network` (eCash mainnet; a config `dashboard` block can override),
+/// not the selected wallet's network. CoinNews is the exception: reading and posting are per-network and need a wallet
 /// on that network, so the section shows only while the selected wallet is on the dashboard's network.
 ///
 /// Layout discipline (Android Compose): a `ScrollView` of fixed cards, each preview a short `ForEach`
@@ -28,7 +29,6 @@ struct DashboardScreen: View {
             Theme.Colors.bg0.ignoresSafeArea()
             ScrollView {
                 VStack(spacing: Theme.Space.x4) {
-                    priceCard
                     networkCard
                     if showsCoinNews { coinNewsCard }
                     ecosystemNewsCard
@@ -81,48 +81,6 @@ struct DashboardScreen: View {
     }
 
     private var now: Int64 { Int64(Date().timeIntervalSince1970) }
-
-    // MARK: - 1. Price
-
-    /// wbECX is the only ECX price before mainnet, so it's the headline; the implied ECX price is a
-    /// labelled secondary line until its ratio is confirmed (plan O2).
-    private var priceCard: some View {
-        let section = app.dashboard.markets
-        return VStack(alignment: .leading, spacing: Theme.Space.x2) {
-            DashboardSectionHeader(title: "ECX price")
-            if let quote = section.value?.wbECX {
-                HStack(alignment: .firstTextBaseline, spacing: Theme.Space.x3) {
-                    Text(verbatim: DashboardFormat.usd(quote.price))
-                        .font(.jbMono(34, .medium))
-                        .foregroundStyle(Theme.Colors.text0)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    if let change = quote.change24h {
-                        Text(verbatim: DashboardFormat.percentChange(change))
-                            .textStyle(.sm)
-                            .foregroundStyle(change < 0 ? Theme.Colors.negative : Theme.Colors.positive)
-                    }
-                }
-                Text("wbECX, wrapped Betanet ECX on Solana", bundle: .module,
-                     comment: "dashboard price card: what the headline price is")
-                    .textStyle(.xs)
-                    .foregroundStyle(Theme.Colors.text1)
-                if let implied = section.value?.impliedECXPrice {
-                    Text("≈ \(DashboardFormat.usd(implied)) implied per ECX (wbECX × \(Int(MarketBoard.ecxPerWbECX)))",
-                         bundle: .module, comment: "dashboard price card: implied ECX price; %1$@ price, %2$lld ratio")
-                        .textStyle(.xs)
-                        .foregroundStyle(Theme.Colors.text2)
-                }
-                DashboardFreshness(updatedAt: section.updatedAt, stale: section.lastAttemptFailed,
-                                   source: quote.source)
-            } else if section.display == .loading {
-                DashboardSkeleton(rows: 2)
-            } else {
-                DashboardUnavailable()
-            }
-        }
-        .dashboardCard()
-    }
 
     // MARK: - 2. Network
 

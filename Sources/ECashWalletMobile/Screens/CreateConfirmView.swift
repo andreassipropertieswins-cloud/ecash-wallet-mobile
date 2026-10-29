@@ -14,13 +14,12 @@ struct CreateConfirmView: View {
     let defaultName: String
     @Environment(AppState.self) var app
     @State var vm: CreateViewModel   // not `private` — Fuse bridges @State to Compose (skip-fuse rule)
-    // Default: the current eCash chain. Changed from .signet 2026-08-28 — eCash is the network this
-    // app exists for, and a signet default meant most users' first wallet was on the wrong chain.
-    // Still never Bitcoin: Bitcoin mainnet stays a deliberate choice (Golden Rule §4). Once
-    // `currentEcash` flips to `.ecashMainnet` (chain past the fork), this IS real money — which is
-    // why `.ecashMainnet` carries Bitcoin's real-money warnings and send confirmation.
-    // Defaults to whichever eCash chain is current (`currentEcash`) — never auto-mainnet
-    // (Golden Rule §6). One constant so a chain move is a single edit.
+    // Default: the current eCash chain — the REAL fork since 2026-10-29 (`currentEcash`). Changed
+    // from .signet 2026-08-28 — eCash is the network this app exists for. Still never Bitcoin:
+    // Bitcoin mainnet stays a deliberate choice (Golden Rule §4). eCash mainnet IS real money, which
+    // is why `.ecashMainnet` carries Bitcoin's real-money warnings and send confirmation — that, not
+    // avoiding the default, is how Golden Rule §6 is honoured here. One constant so a chain move is
+    // a single edit.
     @State var network: WalletNetwork = .currentEcash
     /// The entropy session being shown, if any. Created by Continue — that tap is what draws the
     /// device randomness and timestamp — and cleared on the way back, so every Continue is fresh.

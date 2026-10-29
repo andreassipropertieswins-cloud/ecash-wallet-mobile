@@ -6,15 +6,16 @@ import Foundation
 import Testing
 @testable import ECashWalletMobile
 
+/// The node manifest is the live mainnet one as served 2026-10-29 (trimmed to the fields we read).
 @Suite struct ReleasesClientTests {
-    static let nodeURL = "https://releases.ecash.com/L1-ecash-bitcoin/betanet/latest/release.json"
+    static let nodeURL = "https://releases.ecash.com/L1-ecash-bitcoin/mainnet/latest/release.json"
 
     @Test func readsBothReleases() async throws {
         let web = FakeDashboardWeb()
-        web.on(Self.nodeURL, #"{"version":"31.1.0","commit":"ca64033c137457a3c8ca394186759819a2ab0694","commit_short":"ca64033c1374","files":[]}"#)
+        web.on(Self.nodeURL, #"{"version":"1.2.0-core32.1","commit":"c8474e0b4f2be9b470c46598a5a6a3e55a85b765","commit_short":"c8474e0b4f2b","channel":"mainnet","files":[]}"#)
         web.on(ReleasesClient.walletRepoAPI, #"{"tag_name":"v1.3.0_build30","name":"v1.3.0_build30","html_url":"https://github.com/ecash-com/ecash-wallet-mobile/releases/tag/v1.3.0_build30","published_at":"2026-10-01T21:00:44Z"}"#)
-        let info = try await ReleasesClient(network: .betanet, fetch: web.fetch).releases()
-        #expect(info.node == NodeRelease(version: "31.1.0", commitShort: "ca64033c1374", channel: "betanet"))
+        let info = try await ReleasesClient(network: .mainnet, fetch: web.fetch).releases()
+        #expect(info.node == NodeRelease(version: "1.2.0-core32.1", commitShort: "c8474e0b4f2b", channel: "mainnet"))
         #expect(info.wallet?.displayVersion == "1.3.0 (30)")
         #expect(info.wallet?.publishedAt == 1_790_888_444)
     }
@@ -22,7 +23,7 @@ import Testing
     @Test func oneSourceIsEnough() async throws {
         let web = FakeDashboardWeb()
         web.on(Self.nodeURL, #"{"version":"31.1.0","commit":"abcdef0123456789"}"#)
-        let info = try await ReleasesClient(network: .betanet, fetch: web.fetch).releases()
+        let info = try await ReleasesClient(network: .mainnet, fetch: web.fetch).releases()
         #expect(info.node?.commitShort == "abcdef012345")   // derived when commit_short is absent
         #expect(info.wallet == nil)
     }

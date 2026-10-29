@@ -8,20 +8,29 @@ import WalletService
 /// Watches for the real eCash fork, so eCash mainnet becomes the default eCash network the moment the
 /// chain is past its fork height — with no release and no config change (`EcashMainnetLaunch`).
 ///
-/// Only runs once the config has turned mainnet on (`isOffered`) and until the fork is seen
-/// (`isDefault`), so it costs nothing before and after. It asks an Esplora for `/blocks/tip/height`
-/// (a bare integer; mempool-electrs serves it at the root path): the mainnet entry's own Esplora
-/// first, then Bitcoin's — pre-fork they are the same chain, and post-fork both are past the height.
-/// Betanet's tip is never consulted: betanet mines its own blocks and is already past 973,728.
+/// Only runs while mainnet is offered (`isOffered`, compiled on since 1.4.6 build 44) and until the fork is
+/// seen (`isDefault`), so it costs nothing afterwards. It asks an Esplora for `/blocks/tip/height`
+/// (a bare integer; mempool-electrs serves it at the root path): the mainnet entry's Esplora first
+/// — the remotely configured one, else the bundled `esplora.ecash.ninja`, which is the same host the
+/// config publishes — then Bitcoin's; pre-fork they are the same chain, and post-fork both are past
+/// the height. Betanet's tip is never consulted: betanet mines its own blocks and is already past
+/// 973,728.
 ///
 /// A result below the height, a network error or a malformed body all mean "not yet"; nothing is
 /// written. The latch is one-way (`recordObservedTip`): a fork does not un-happen.
 enum ForkWatch {
-    /// The Esplora bases to ask, in order. Only remotely-configured ones: a bundled guess could
-    /// not be trusted to describe the right chain.
+    /// The Esplora bases to ask, in order: mainnet's (remote if the config has been fetched, else
+    /// the bundled one — since 2026-10-26 they are the same host, so the default flip no longer
+    /// waits on a fetch), then Bitcoin's remote one. Bitcoin's bundled default is Electrum, so it
+    /// has no bundled fallback here.
     static func candidateBases() -> [String] {
         var out: [String] = []
-        if let mainnet = RemoteServiceOverrides.esploraURL(for: .ecashMainnet) { out.append(mainnet) }
+        if let mainnet = RemoteServiceOverrides.esploraURL(for: .ecashMainnet) {
+            out.append(mainnet)
+        } else {
+            let bundled = NetworkRegistry.params(for: .ecashMainnet)
+            if bundled.defaultBackendKind == "esplora" { out.append(bundled.defaultBackend) }
+        }
         if let bitcoin = RemoteServiceOverrides.esploraURL(for: .bitcoin) { out.append(bitcoin) }
         return out
     }

@@ -159,21 +159,23 @@ public enum WalletNetwork: String, Equatable, Hashable, Sendable, CaseIterable {
     /// option** (e.g. until its RPC ships), comment out the `.thunder` line below: the case still
     /// exists so existing Thunder wallets keep resolving; users just can't create new ones.
     ///
-    /// **eCash mainnet is listed only once the remote config publishes it** (`EcashMainnetLaunch.isOffered`),
-    /// so the picker can't offer a network the app has no live endpoint for.
+    /// **eCash mainnet is listed FIRST when `EcashMainnetLaunch.isOffered`** — compiled on since 1.4.6 build 44;
+    /// before that only once the remote config had published it (and a launch whose first fetch
+    /// failed showed no mainnet until a later resume — the Android 1.4.6 report).
     public static var selectable: [WalletNetwork] {
-        // Order is the picker order (Jake, 2026-10-26): the eCash chains first — betanet, then the
-        // real fork once offered — then Bitcoin, then the dev networks. The DEFAULT selection is a
-        // separate rule (`currentEcash`), so the real fork taking over at the fork height doesn't
-        // reorder anything.
+        // Order is the picker order (Jake, 2026-10-29): the real eCash fork first, then betanet,
+        // then Bitcoin, then the dev networks. The DEFAULT selection is a separate rule
+        // (`currentEcash`), which also points at the real fork.
         //
         // Alphanet (`.ecash`) was retired 2026-10-26: gone from the remote config, so it is gone
         // from here. The case stays because its rawValue is persisted in existing wallets, which
         // keep loading (and can be removed or copied to betanet/mainnet); nobody can create one.
-        var out: [WalletNetwork] = [.ecashBeta]
+        // 2026-10-29 (Jake): the real fork goes FIRST, ahead of betanet — it is now the default too.
+        var out: [WalletNetwork] = []
         if EcashMainnetLaunch.isOffered {
             out.append(.ecashMainnet)
         }
+        out.append(.ecashBeta)
         out.append(.bitcoin)
         out.append(.signet)
         // Thunder: re-enabled 2026-09-29. It was hidden while the drivechain-esplora index held no
@@ -184,22 +186,20 @@ public enum WalletNetwork: String, Equatable, Hashable, Sendable, CaseIterable {
         return out
     }
 
-    /// **The eCash chain the app currently points at** for new wallets, imports, and investor
-    /// claims. One place so "which eCash is live" is a single rule, not a hunt through defaults.
+    /// **The eCash chain the app currently points at** for new wallets and imports. One place so
+    /// "which eCash is live" is a single rule, not a hunt through defaults. NOT used by the investor
+    /// claim since 2026-10-29: a claim follows the selected wallet's eCash chain, else mainnet
+    /// (`ClaimNetwork` in the app).
     ///
-    /// `.ecashBeta` (betanet) until the real fork, then `.ecashMainnet` — the switch is driven by the
-    /// chain, not a release (`EcashMainnetLaunch.isDefault`): mainnet takes over only once the remote
-    /// config lists it AND the chain has been observed past its `fork_height`. Before the fork the
-    /// "mainnet" chain is still Bitcoin, so defaulting there early would create wallets on a chain
-    /// that doesn't exist yet. Existing wallets are unaffected either way: a wallet's network is fixed
-    /// at creation and persisted, so this only steers NEW ones.
-    ///
-    /// Safe to move for claims specifically, because an investor key holds the same pre-fork Bitcoin
-    /// UTXOs on **every** eCash fork — all of them inherit the pre-fork set, so a claim works on
-    /// whichever one this points at.
-    public static var currentEcash: WalletNetwork {
-        EcashMainnetLaunch.isDefault ? .ecashMainnet : .ecashBeta
-    }
+    /// **The real fork, `.ecashMainnet`, unconditionally** (Jake, 2026-10-29, 1.4.6 build 44 — hours
+    /// before block 973,728). Until then this was betanet until the chain had been observed past the
+    /// fork (`EcashMainnetLaunch.isDefault`); that latch still records whether the fork has been seen
+    /// but no longer steers anything. Pre-fork the "mainnet" chain is still Bitcoin, so for the few
+    /// hours this ships ahead of the block a new wallet here sees Bitcoin's chain under the ECX label
+    /// and any send is non-final (compiled replay nLockTime) — it fails loud, nothing moves. Existing
+    /// wallets are unaffected: a wallet's network is fixed at creation and persisted, so this only
+    /// steers NEW ones (and the claim has its own rule — `ClaimNetwork` in the app).
+    public static var currentEcash: WalletNetwork { .ecashMainnet }
 
     /// Whether coin-splitting applies to this network — i.e. it is a Bitcoin fork whose pre-fork
     /// UTXOs are shared with Bitcoin and therefore need separating (`SplitSummary.classify`,

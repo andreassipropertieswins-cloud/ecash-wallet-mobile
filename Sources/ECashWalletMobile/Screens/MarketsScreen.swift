@@ -12,24 +12,6 @@ struct MarketsScreen: View {
     var body: some View {
         let section = app.dashboard.markets
         List {
-            if let wbECX = section.value?.wbECX {
-                Section(header: header(Text("ECX", bundle: .module, comment: "markets: ECX section"))) {
-                    MarketRow(quote: wbECX, detailed: true)
-                    if let implied = section.value?.impliedECXPrice {
-                        HStack {
-                            Text("Implied ECX (wbECX × \(Int(MarketBoard.ecxPerWbECX)))", bundle: .module,
-                                 comment: "markets: implied ECX price label; %lld is the ratio")
-                                .textStyle(.sm)
-                                .foregroundStyle(Theme.Colors.text1)
-                            Spacer(minLength: Theme.Space.x2)
-                            Text(verbatim: DashboardFormat.usd(implied))
-                                .font(.jbMono(14, .medium))
-                                .foregroundStyle(Theme.Colors.text0)
-                        }
-                    }
-                }
-                .listRowBackground(Theme.Colors.bg2)
-            }
             Section(header: header(Text("Bitcoin and its forks", bundle: .module, comment: "markets: comparison section")),
                     footer: footnote(section)) {
                 ForEach(section.value?.quotes ?? []) { quote in
@@ -53,8 +35,8 @@ struct MarketsScreen: View {
 
     private func footnote(_ section: DashboardSection<MarketBoard>) -> some View {
         VStack(alignment: .leading, spacing: Theme.Space.x1) {
-            Text("Prices in USDT on Gate.io and NonKYC, and in USDC for wbECX (Jupiter, with volume from the Orca pool). The implied ECX price multiplies the wrapped token's price by \(Int(MarketBoard.ecxPerWbECX)).",
-                 bundle: .module, comment: "markets footnote: sources and the implied-price formula; %lld is the ratio")
+            Text("Prices in USDT on Gate.io and NonKYC. ECX itself is not listed on a public exchange yet.",
+                 bundle: .module, comment: "markets footnote: sources, and why there is no ECX row")
             DashboardFreshness(updatedAt: section.updatedAt, stale: section.lastAttemptFailed)
         }
         .textStyle(.xs)

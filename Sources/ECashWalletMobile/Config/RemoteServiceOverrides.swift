@@ -115,7 +115,7 @@ enum RemoteServiceOverrides {
     }
 
 
-    /// The remotely-configured dashboard network, or nil if none stored (→ `DashboardNetwork.betanet`).
+    /// The remotely-configured dashboard network, or nil if none stored (→ `DashboardNetwork.mainnet`).
     static func dashboardNetwork() -> DashboardNetwork? {
         guard let json = defaults.string(forKey: dashboardNetworkKey) else { return nil }
         return try? JSONDecoder().decode(DashboardNetwork.self, from: Data(json.utf8))

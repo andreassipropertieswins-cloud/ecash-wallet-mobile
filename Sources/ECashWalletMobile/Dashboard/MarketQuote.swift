@@ -7,8 +7,8 @@ import Foundation
 /// One asset's price from one public ticker. Display data only — never wallet money, so `Double` is
 /// fine here (wallet amounts stay `Int64` sats, CLAUDE.md §6).
 ///
-/// Quotes are in the venue's dollar: USDT on Gate.io and NonKYC, USDC for wbECX. The UI shows
-/// "$" and the Markets footnote says which is which, rather than converting between stablecoins.
+/// Quotes are in the venue's dollar (USDT on Gate.io and NonKYC). The UI shows "$" and the Markets
+/// footnote says so, rather than converting between stablecoins.
 struct MarketQuote: Equatable, Codable, Sendable, Identifiable {
     let id: String          // stable asset id ("btc")
     let name: String        // "Bitcoin"
@@ -22,19 +22,10 @@ struct MarketQuote: Equatable, Codable, Sendable, Identifiable {
     let source: String
 }
 
-/// The market section: the comparison table plus wbECX, the only ECX price there is before mainnet.
+/// The market section: the comparison table. There is no ECX quote yet — real ECX is not listed on
+/// any keyless venue (Gate.io and NonKYC checked 2026-10-29), and the Betanet wbECX row (Solana, ×50
+/// implied price) was dropped with Betanet when the dashboard moved to mainnet (2026-10-29).
 struct MarketBoard: Equatable, Codable, Sendable {
     /// BTC, BCH, BSV, XEC, BTCB2 — whichever loaded, in that order.
     let quotes: [MarketQuote]
-    /// Wrapped betanet ECX on Solana (Orca pool), via Jupiter + Orca. Nil if both failed.
-    let wbECX: MarketQuote?
-
-    /// The ECX price implied by the wrapped token: `wbECX × ecxPerWbECX`.
-    ///
-    /// The reference dashboard uses ×50 ("wbECX × 50, using 20M ECX"). **What the ratio means is an
-    /// open question** (`docs/dashboard-plan.md` O2), so the UI shows the wbECX price as the headline
-    /// and this only as a labelled secondary line — the derivation is never hidden.
-    var impliedECXPrice: Double? { wbECX.map { $0.price * MarketBoard.ecxPerWbECX } }
-
-    static let ecxPerWbECX: Double = 50
 }

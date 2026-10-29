@@ -16,13 +16,10 @@ struct ImportWalletView: View {
     let defaultName: String
     @State var vm: ImportViewModel   // not `private` — Fuse bridges @State to Compose (skip-fuse rule)
     @State var walletName = ""
-    // Default: the current eCash chain (`currentEcash`). Changed from .signet 2026-08-28 — eCash is the network this app
-    // exists for, and a signet default meant most users' first wallet was on the wrong chain.
-    // Still never Bitcoin: mainnet stays a deliberate choice (Golden Rule §4).
-    //
-    // NOTE for whoever moves `.ecash` off the dry-run chain: the case follows the remote config,
-    // which points at alphanet today (test value). When it rolls to real eCash mainnet, THIS LINE
-    // silently becomes "default to real money" — revisit it then.
+    // Default: the current eCash chain (`currentEcash`) — the REAL fork since 2026-10-29, so this
+    // defaults to real money by design; `.ecashMainnet` carries the real-money warnings. Changed
+    // from .signet 2026-08-28 — eCash is the network this app exists for. Still never Bitcoin:
+    // Bitcoin mainnet stays a deliberate choice (Golden Rule §4).
     @State var network: WalletNetwork = .currentEcash
     @State var advancedExpanded = false           // Advanced: import type (+ later, derivation path)
 
@@ -35,16 +32,21 @@ struct ImportWalletView: View {
 
     /// - Parameters:
     ///   - claimMode: enter straight into the investor-claim flow — private-key input, with the
-    ///     network picker and Advanced hidden entirely. Both paths default to eCash now, so this
-    ///     only pins the import TYPE; a claimant was handed a key, not a recovery phrase.
-    init(viewModel: ImportViewModel, defaultName: String, claimMode: Bool = false) {
+    ///     network picker and Advanced hidden entirely; a claimant was handed a key, not a recovery
+    ///     phrase.
+    ///   - claimNetwork: the eCash chain the claim lands on (`ClaimNetwork.target`, from the selected
+    ///     wallet). Ignored unless `claimMode`.
+    init(viewModel: ImportViewModel, defaultName: String, claimMode: Bool = false,
+         claimNetwork: WalletNetwork = .ecashMainnet) {
         self.defaultName = defaultName
         viewModel.kind = claimMode ? .privateKey : .recoveryPhrase
         _vm = State(initialValue: viewModel)
-        // Both import and CLAIM land on the current eCash chain. In claim mode the network
-        // picker is hidden entirely, so this IS the claim network — an investor key holds the
-        // same pre-fork UTXOs on every eCash fork, so it resolves wherever this points.
-        _network = State(initialValue: .currentEcash)
+        // A CLAIM lands on `claimNetwork` — the selected wallet's eCash chain, else mainnet
+        // (`ClaimNetwork`, Jake 2026-10-29). The network picker is hidden in claim mode, so this IS
+        // the claim network. It deliberately does NOT follow `currentEcash`, which stays betanet
+        // until the chain is seen past the fork. An ordinary import still defaults to the current
+        // eCash chain.
+        _network = State(initialValue: claimMode ? claimNetwork : .currentEcash)
         _advancedExpanded = State(initialValue: claimMode)
         _isClaim = State(initialValue: claimMode)
     }

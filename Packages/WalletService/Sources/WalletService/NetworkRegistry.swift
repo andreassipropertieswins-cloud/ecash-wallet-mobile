@@ -136,12 +136,12 @@ public enum NetworkRegistry {
             // forks: Bitcoin bytes, `bc` HRP, coin-type `0'`, ECX. Its consensus differences (replay
             // marker, fork height, opcode) live below, compiled — never in config.
             //
-            // These bundled endpoints are an UNVERIFIED best guess from L2L's naming pattern
-            // (alphanet `esplora.alpha.ecash.ninja`, betanet `esplora.beta.ecash.ninja`) and are only
-            // the offline fallback: the network is not even offered until the remote config has
-            // delivered its `ecash-mainnet` entry (`EcashMainnetLaunch.isOffered`), at which point
-            // the config's backend wins over these. If the guess is wrong, a sync fails loudly; it
-            // can't point a wallet at the wrong chain, because nothing else serves eCash mainnet.
+            // These bundled endpoints match the `ecash` entry drivechain.dev/config published on
+            // 2026-10-26 (`esplora.ecash.ninja`, priority 0; `explorer.ecash.ninja` tx pages). The
+            // config's backend still wins over them once fetched (`resolvedBackend`); since 1.4.6 build 44 the
+            // network is offered without waiting for that fetch (`EcashMainnetLaunch.isOffered`), so
+            // a first launch syncs against these until the config lands. Nothing else serves eCash
+            // mainnet, so a wrong URL fails loudly rather than pointing a wallet at another chain.
             return NetworkParams(
                 coinType: Int32(0),
                 addressHRP: "bc",

@@ -127,11 +127,12 @@ import WalletService
 
     // MARK: - Chain currency and capability
 
-    /// The claim button and both create/import defaults read `currentEcash`. Alphanet still runs but
-    /// is no longer where the work is (2026-09-21), so new wallets and investor claims land on
-    /// betanet. Existing alphanet wallets are untouched — network is fixed at creation.
-    @Test func newWalletsAndClaimsPointAtBetanet() {
-        #expect(WalletNetwork.currentEcash == .ecashBeta)
+    /// Both create/import defaults read `currentEcash`, which has been the REAL fork since
+    /// 2026-10-29 (betanet from 2026-09-21 until then; the claim has its own rule, `ClaimNetwork`).
+    /// Existing betanet/alphanet wallets are untouched — network is fixed at creation.
+    @Test func newWalletsPointAtTheRealFork() {
+        #expect(WalletNetwork.currentEcash == .ecashMainnet)
+        #expect(WalletNetwork.selectable.first == .ecashMainnet)
     }
 
     /// **The regression this file's second half exists for.** Split-coins was gated by six scattered

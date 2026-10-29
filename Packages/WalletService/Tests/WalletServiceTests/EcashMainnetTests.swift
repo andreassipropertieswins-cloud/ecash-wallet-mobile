@@ -90,39 +90,45 @@ final class EcashMainnetTests: XCTestCase {
 
     // MARK: - Launch gates
 
-    /// Picker order (Jake, 2026-10-26): eCash chains first, then Bitcoin, then the dev networks;
-    /// the real fork slots in after betanet once offered. The default is `currentEcash`, not position.
-    func testPickerOrderPutsTheECashChainsFirst() {
-        XCTAssertEqual(WalletNetwork.selectable,
-                       [WalletNetwork.ecashBeta, WalletNetwork.bitcoin, WalletNetwork.signet, WalletNetwork.thunder])
+    /// Picker order (Jake, 2026-10-29): the real fork first, then betanet, then Bitcoin, then the
+    /// dev networks. The default is `currentEcash` (also the real fork). The order is the same with
+    /// and without a fetched config.
+    func testPickerOrderPutsTheRealForkFirst() {
+        let expected = [WalletNetwork.ecashMainnet, WalletNetwork.ecashBeta, WalletNetwork.bitcoin,
+                        WalletNetwork.signet, WalletNetwork.thunder]
+        XCTAssertEqual(WalletNetwork.selectable, expected)
         EcashMainnetLaunch.resetForTesting(offered: true)
-        XCTAssertEqual(WalletNetwork.selectable,
-                       [WalletNetwork.ecashBeta, WalletNetwork.ecashMainnet, WalletNetwork.bitcoin,
-                        WalletNetwork.signet, WalletNetwork.thunder])
+        XCTAssertEqual(WalletNetwork.selectable, expected)
     }
 
-    func testHiddenUntilTheConfigPublishesIt() {
-        XCTAssertFalse(EcashMainnetLaunch.isOffered)
-        XCTAssertFalse(WalletNetwork.selectable.contains(WalletNetwork.ecashMainnet))
-        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashBeta)
-        // The chain being past the fork changes nothing while the config hasn't published the entry.
-        XCTAssertFalse(EcashMainnetLaunch.recordObservedTip(height: Int64(999_999)) && EcashMainnetLaunch.isDefault)
-        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashBeta)
+    /// Since 1.4.6 build 44 the offer is compiled in (the config published the entry 2026-10-26): with NO
+    /// config ever fetched, mainnet is in the picker, first, and is the default for new wallets and
+    /// imports — none of it waits for a fetch or for the fork (Jake, 2026-10-29). The fork latch is
+    /// independent: closed until a tip past the height is recorded, and it steers nothing.
+    func testOfferedFirstAndDefaultBeforeAnyConfigOrFork() {
+        XCTAssertTrue(EcashMainnetLaunch.offeredInThisBuild)
+        XCTAssertTrue(EcashMainnetLaunch.isOffered)
+        XCTAssertEqual(WalletNetwork.selectable.first, WalletNetwork.ecashMainnet)
+        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashMainnet)
+        XCTAssertFalse(EcashMainnetLaunch.isDefault)
+        XCTAssertTrue(EcashMainnetLaunch.recordObservedTip(height: Int64(999_999)))
+        XCTAssertTrue(EcashMainnetLaunch.isDefault)
+        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashMainnet)
     }
 
-    func testOfferedOnceTheConfigPublishesItButNotYetTheDefault() {
+    func testAFetchedConfigChangesNothingAboutTheOfferOrTheLatch() {
         EcashMainnetLaunch.resetForTesting(offered: true)
         XCTAssertTrue(EcashMainnetLaunch.isOffered)
         XCTAssertTrue(WalletNetwork.selectable.contains(WalletNetwork.ecashMainnet))
         XCTAssertTrue(WalletNetwork.selectable.contains(WalletNetwork.ecashBeta), "betanet stays")
         XCTAssertFalse(EcashMainnetLaunch.isDefault)
-        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashBeta)
+        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashMainnet)
     }
 
-    func testBecomesTheDefaultOnlyAtTheForkHeight() {
+    func testTheForkLatchFlipsOnlyAtTheForkHeight() {
         EcashMainnetLaunch.resetForTesting(offered: true)
         XCTAssertFalse(EcashMainnetLaunch.recordObservedTip(height: Int64(973_727)))
-        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashBeta)
+        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashMainnet)
 
         XCTAssertTrue(EcashMainnetLaunch.recordObservedTip(height: Int64(973_728)))
         XCTAssertTrue(EcashMainnetLaunch.isDefault)
@@ -139,7 +145,7 @@ final class EcashMainnetTests: XCTestCase {
         WalletManager.setRemoteForkHeightForTesting(Int64(980_000), network: WalletNetwork.ecashMainnet)
         XCTAssertEqual(EcashMainnetLaunch.forkHeight, Int64(980_000))
         XCTAssertFalse(EcashMainnetLaunch.recordObservedTip(height: Int64(973_728)))
-        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashBeta)
+        XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashMainnet)
         XCTAssertTrue(EcashMainnetLaunch.recordObservedTip(height: Int64(980_000)))
         XCTAssertEqual(WalletNetwork.currentEcash, WalletNetwork.ecashMainnet)
     }
